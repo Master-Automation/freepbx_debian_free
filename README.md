@@ -8,53 +8,30 @@
 |_|  |_|  \___|\___|_|    |____/_/ \_\
 Your Open Source Asterisk PBX GUI Solution
 ```
+# Адаптированный скрипт установки FreePBX 17 для Debian 12
 
-### What?
+Данный скрипт является модифицированной версией официального установщика FreePBX. 
+Он адаптирован для стабильной работы в российских сетях, использует локальные зеркала и не требует установки драйверов DAHDI (подходит только для IP-телефонии).
 
-[FreePBX](http://www.freepbx.org/ "FreePBX Home Page") is an open source GUI (graphical user interface) that controls and manages [Asterisk©](http://www.asterisk.org/ "Asterisk Home Page") (PBX). FreePBX is licensed under GPL.
+## Особенности
 
-This is a FreePBX 17 installation script.
+- Использует российские зеркала Debian (mirror.yandex.ru) и FreePBX (git.freepbx.asterisk.ru).
+- Не устанавливает пакет `libtonezone` и драйверы DAHDI (избегает ошибок в Debian 12).
+- Собирает Asterisk 22 из исходных кодов (обход проблем с репозиторием).
+- Удаляет коммерческие модули (флаг `--opensourceonly`).
+- Подходит для чистой IP-телефонии без аналоговых плат.
 
-This script is to install FreePBX  on the top of vanilla Debian 12.x OS.
+## Требования
 
-[FreePBX](http://www.freepbx.org/ "FreePBX Home Page") is a completely modular GUI for Asterisk written in PHP and Javascript. Meaning you can easily write any module you can think of and distribute it free of cost to your clients so that they can take advantage of beneficial features in [Asterisk](http://www.asterisk.org/ "Asterisk Home Page")
+- Чистая установка Debian 12 (Bookworm) (минимальная, без графического окружения).
+- Доступ в интернет (для загрузки исходников и пакетов).
+- Права root.
 
-### Setting up a FreePBX system
+## Установка
 
-[See our WIKI](https://sangomakb.atlassian.net/wiki/spaces/FP/pages/9732130/Install+FreePBX)
-
-### License
-
-[This modules code is licensed as GPLv3+](https://www.gnu.org/licenses/gpl-3.0.txt)
-
-### Contributing
-
-To contribute code or modules back into the [FreePBX](http://www.freepbx.org/ "FreePBX Home Page") ecosystem you must fully read our Code License Agreement. We are not able to look at or accept patches or code of any kind until this document is filled out. To view and sign the contributor license agreement you can visit <https://oss-cla.sangoma.com/freepbx/sng_freepbx_debian_install>. Signing this contributor license agreement once allows you to contribute to all open source projects from Sangoma, including FreePBX. Please take a look at [https://sangomakb.atlassian.net/wiki/spaces/FP/pages/10682663/Code+License+Agreement](https://sangomakb.atlassian.net/wiki/spaces/FP/pages/10682663/Code+License+Agreement) for more information
-
-### Issues
-
-Please file bug reports at <https://github.com/FreePBX/issue-tracker/issues>
-
-### How to execute the script
-
-Steps -
-
-1) ssh to the Debian system as 'root'
-
-2) Download the file using `wget`:
+Скачайте скрипт и запустите его от root:
 
 ```bash
-wget https://github.com/FreePBX/sng_freepbx_debian_install/raw/master/sng_freepbx_debian_install.sh -O /tmp/sng_freepbx_debian_install.sh
-```
-
-3) Execute the script:
-
-```bash
-bash /tmp/sng_freepbx_debian_install.sh
-```
-
-The script will install the necessary dependencies for FreePBX, followed by the FreePBX software itself.
-
-The installation duration may vary depending on your internet bandwidth and system capacity.
-
-You can find detailed installation logs at `/var/log/pbx/freepbx17-install.log`.
+wget https://raw.githubusercontent.com/Master-Automation/sng_freepbx_debian_install/master/russian.sh
+chmod +x russian.sh
+sudo ./russian.sh --skipversion --opensourceonly
