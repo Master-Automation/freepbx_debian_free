@@ -856,8 +856,6 @@ DEPPRODPKGS=(
  	"avahi-utils"
 	"libnss-mdns"
 	"mailutils"
-	# Asterisk package
-	"liburiparser1"
 	# ffmpeg package
 	"libavdevice59"
 	# System Admin module
@@ -1106,11 +1104,10 @@ else
     ./contrib/scripts/install_prereq install
     ./configure --libdir=/usr/lib64 --with-pjproject-bundled
     make menuselect.makeopts
-    
-    # Automatically enable common modules (no interactive menu)
+     # Automatically enable common modules (no interactive menu)
     menuselect/menuselect --enable chan_pjsip --enable res_srtp --enable res_http_websocket --enable codec_opus --enable codec_g729a --enable format_mp3
     
-    make
+    make -j2
     make install
     make config
     ldconfig
