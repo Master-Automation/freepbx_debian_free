@@ -32,6 +32,23 @@ fi
 
 export PATH=$SANE_PATH
 
+# Функции логирования
+echo_ts() { echo "$(date +"%Y-%m-%d %T") - $*"; }
+log() { echo_ts "$*" >> "$LOG_FILE"; }
+message() { echo_ts "$*" | tee -a "$LOG_FILE"; }
+setCurrentStep () { currentStep="$1"; message "${currentStep}"; }
+
+terminate() {
+    if [ $? -ne 0 ]; then
+        echo_ts "Последние 10 строк лога:"
+        tail -n 10 "$LOG_FILE"
+    fi
+    rm -f "$pidfile"
+    message "Скрипт завершён."
+}
+
+
+
 # Парсинг параметров
 while [[ $# -gt 0 ]]; do
     case $1 in
