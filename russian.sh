@@ -11,7 +11,6 @@ LOG_FOLDER="/var/log/pbx"
 LOG_FILE="${LOG_FOLDER}/freepbx17-install-$(date '+%Y.%m.%d-%H.%M.%S').log"
 log=$LOG_FILE
 SANE_PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-DEBIAN_MIRROR="https://mirror.yandex.ru/debian/"
 NPM_MIRROR=""
 
 # Проверка ОС
@@ -165,8 +164,8 @@ setup_repositories() {
     fi
     wget -O - http://git.freepbx.asterisk.ru/gpg/aptly-pubkey.asc | gpg --dearmor --yes -o /etc/apt/trusted.gpg.d/freepbx.gpg >> "$log"
 
-    # Полные репозитории Debian от Яндекса (HTTPS)
-    cat >> /etc/apt/sources.list <<EOF
+   # Полные репозитории Debian от Яндекса (HTTPS)
+cat >> /etc/apt/sources.list <<EOF
 deb https://mirror.yandex.ru/debian/ bookworm main contrib non-free non-free-firmware
 deb-src https://mirror.yandex.ru/debian/ bookworm main contrib non-free non-free-firmware
 
@@ -176,7 +175,6 @@ deb-src https://mirror.yandex.ru/debian-security/ bookworm-security main contrib
 deb https://mirror.yandex.ru/debian/ bookworm-updates main contrib non-free non-free-firmware
 deb-src https://mirror.yandex.ru/debian/ bookworm-updates main contrib non-free non-free-firmware
 EOF
-
     # Обновляем список пакетов
     apt-get update >> "$log"
 }
@@ -213,27 +211,6 @@ safe_fwconsole_reload() {
         return 1
     fi
 }
-
-
-# Безопасная перезагрузка FreePBX с проверкой
-safe_fwconsole_reload() {
-    message "Выполняется: fwconsole reload"
-    fwconsole reload
-    if [ $? -eq 0 ]; then
-        sleep 3
-        if asterisk -rx "core show version" > /dev/null 2>&1; then
-            message "fwconsole reload выполнен успешно, Asterisk отвечает."
-            return 0
-        else
-            message "ОШИБКА: fwconsole reload завершился, но Asterisk не отвечает!"
-            return 1
-        fi
-    else
-        message "ОШИБКА: Не удалось выполнить fwconsole reload."
-        return 1
-    fi
-}
-
 
 
 # ===========================
@@ -298,7 +275,8 @@ DEPPRODPKGS=(
     "pkgconf" "libicu-dev" "libsrtp2-1" "libspandsp2" "libncurses5" "autoconf"
     "libical3" "libneon27" "libsnmp40" "libbluetooth3" "libunbound8" "libsybdb5"
     "libspeexdsp1" "libiksemel3" "libresample1" "libgmime-3.0-0" "libc-client2007e"
-    "imagemagick"
+    "imagemagick" "libjansson-dev" "libxml2-dev" "libsqlite3-dev" "libcurl4-openssl-dev"
+    "libedit-dev" "uuid-dev"
 )
 for i in "${!DEPPRODPKGS[@]}"; do
     pkg_install "${DEPPRODPKGS[$i]}"
