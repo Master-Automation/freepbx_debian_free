@@ -11,6 +11,7 @@ LOG_FOLDER="/var/log/pbx"
 LOG_FILE="${LOG_FOLDER}/freepbx17-install-$(date '+%Y.%m.%d-%H.%M.%S').log"
 log=$LOG_FILE
 SANE_PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+DEBIAN_MIRROR="https://mirror.yandex.ru/debian/"
 NPM_MIRROR=""
 
 # Проверка ОС
@@ -213,10 +214,43 @@ safe_fwconsole_reload() {
     fi
 }
 
+
+# Безопасная перезагрузка FreePBX с проверкой
+safe_fwconsole_reload() {
+    message "Выполняется: fwconsole reload"
+    fwconsole reload
+    if [ $? -eq 0 ]; then
+        sleep 3
+        if asterisk -rx "core show version" > /dev/null 2>&1; then
+            message "fwconsole reload выполнен успешно, Asterisk отвечает."
+            return 0
+        else
+            message "ОШИБКА: fwconsole reload завершился, но Asterisk не отвечает!"
+            return 1
+        fi
+    else
+        message "ОШИБКА: Не удалось выполнить fwconsole reload."
+        return 1
+    fi
+}
+
+
+
 # ===========================
 # Основной процесс установки
 # ===========================
 pidfile='/var/run/freepbx17_installer.pid'
+# Проверка, не запущен ли уже другой экземпляр скрипта
+if [ -f "$pidfile" ]; then
+    old_pid=$(cat "$pidfile")
+    if ps -p "$old_pid" > /dev/null 2>&1; then
+        echo "Ошибка: Скрипт уже запущен (PID $old_pid). Выход."
+        exit 1
+    else
+        echo "Предупреждение: Найден старый pid-файл, удаляем."
+        rm -f "$pidfile"
+    fi
+fi
 echo "$$" > "$pidfile"
 
 setCurrentStep "Начало установки FreePBX 17"
@@ -308,12 +342,15 @@ pkg_install freepbx17
 # Удаление коммерческих модулей (оставляем только нужные)
 if [ "$opensourceonly" ]; then
     setCurrentStep "Удаление ненужных коммерческих модулей"
-    modules_to_remove=$(fwconsole ma list | awk '/Commercial/ {print $2}' | grep -v -E "sysadmin17|firewall|customcontexts")
+    # Список модулей, которые НЕ удаляем (оставляем)
+    keep_modules="sysadmin|firewall|customcontexts"
+    # Получаем список коммерческих модулей, исключая те, что в keep_modules
+    modules_to_remove=$(fwconsole ma list | awk '/Commercial/ {print $2}' | grep -vE "$keep_modules" || true)
     if [ -n "$modules_to_remove" ]; then
-        echo "$modules_to_remove" | xargs -t -I {} fwconsole ma -f remove {} >> "$log" 2>&1 || true
+        echo "$modules_to_remove" | xargs -t -I {} fwconsole ma -f remove {} >> "$log" 2>&1
         message "Ненужные коммерческие модули удалены. Модули Sysadmin, Firewall и Custom Contexts оставлены."
     else
-        message "Коммерческие модули для удаления не найдены."
+        message "Коммерческие модули для удаления не найдены (или все уже удалены)."
     fi
 fi
 
@@ -322,6 +359,20 @@ safe_fwconsole_reload
 
 # Настройка Apache
 setCurrentStep "Настройка веб-сервера Apache"
+# Создаём конфигурационный файл виртуального хоста
+cat > /etc/apache2/sites-available/freepbx.conf <<'EOF'
+<VirtualHost *:80>
+    DocumentRoot /var/www/html
+    ServerName 192.168.20.1
+    <Directory /var/www/html>
+        Options FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+    ErrorLog ${APACHE_LOG_DIR}/freepbx-error.log
+    CustomLog ${APACHE_LOG_DIR}/freepbx-access.log combined
+</VirtualHost>
+EOF
 a2enmod ssl expires headers rewrite
 a2dissite 000-default.conf 2>/dev/null || true
 a2ensite freepbx.conf
@@ -354,7 +405,12 @@ ExecStop=/usr/sbin/fwconsole stop
 [Install]
 WantedBy=multi-user.target
 EOF
+
+
 systemctl daemon-reload
+systemctl stop freepbx 2>/dev/null || true
+systemctl start freepbx
+systemctl enable freepbx
 
 # Блокировка обновлений пакетов
 apt-mark hold sangoma-pbx17 nodejs node-* freepbx17 >> "$log"
