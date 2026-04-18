@@ -298,199 +298,80 @@ pkg_install() {
 }
 
 # Function to install the asterisk and dependent packages
+# Function to install Asterisk from source (bypass broken repos)
 install_asterisk() {
-	astver=$1
-	ASTPKGS=("addons"
-		"addons-bluetooth"
-		"addons-core"
-		"addons-mysql"
-		"addons-ooh323"
-		"core"
-		"curl"
-		"doc"
-		"odbc"
-		"ogg"
-		"flite"
-		"g729"
-		"resample"
-		"snmp"
-		"speex"
-		"sqlite3"
-		"res-digium-phone"
-		"voicemail"
-	)
-
-	# creating directories
-	mkdir -p /var/lib/asterisk/moh
-	pkg_install asterisk"$astver"
-
-	for i in "${!ASTPKGS[@]}"; do
-		pkg_install asterisk"$astver"-"${ASTPKGS[$i]}"
-	done
-
-	pkg_install asterisk"$astver".0-freepbx-asterisk-modules
-	pkg_install asterisk-version-switch
-	pkg_install asterisk-sounds-*
+    astver=$1
+    message "Building Asterisk ${astver} from source (APT repo unavailable)."
+    
+    cd /usr/src
+    # Remove old source if exists
+    rm -rf asterisk-${astver}*
+    git clone -b ${astver} https://github.com/asterisk/asterisk.git asterisk-${astver}
+    cd asterisk-${astver}
+    
+    # Install build dependencies
+    ./contrib/scripts/install_prereq install
+    
+    # Configure
+    ./configure --libdir=/usr/lib64 --with-pjproject-bundled
+    
+    # Prepare menuselect (enable common modules automatically)
+    make menuselect.makeopts
+    menuselect/menuselect --enable chan_pjsip --enable res_srtp --enable res_http_websocket --enable codec_opus --enable codec_g729a --enable format_mp3
+    
+    # Build and install
+    make
+    make install
+    make config
+    ldconfig
+    
+    # Create directories
+    mkdir -p /var/lib/asterisk/moh
+    chown -R asterisk:asterisk /var/lib/asterisk
+    
+    message "Asterisk ${astver} installed successfully from source."
 }
-
 
 
 setup_repositories() {
-	# apt-key del "9641 7C6E 0423 6E0A 986B  69EF DE82 7447 3C8D 0E52" >> "$log"
+    # Используем стабильное российское зеркало FreePBX
+    REPO_URL="http://git.freepbx.asterisk.ru/freepbx17-prod"
+    REPO_LINE="deb [arch=amd64] $REPO_URL bookworm main"
+    REPO_FILE="/etc/apt/sources.list"
 
-	# wget -O - http://deb.freepbx.org/gpg/aptly-pubkey.asc | gpg --dearmor --yes -o /etc/apt/trusted.gpg.d/freepbx.gpg  >> "$log"
-
-	if [ "$testrepo" ]; then
-		REPO_URL="http://deb.freepbx.org/freepbx17-dev"
-	else
-		REPO_URL="http://deb.freepbx.org/freepbx17-prod"
-	fi
-
-	REPO_LINE="deb [arch=amd64] $REPO_URL bookworm main"
-	REPO_FILE="/etc/apt/sources.list"
-
-	# Only add the line if it's not already present
-	if ! grep -qsF "$REPO_LINE" "$REPO_FILE" 2>/dev/null; then
-		echo "$REPO_LINE" | tee -a "$REPO_FILE" >> "$log"
-		echo "Added FreePBX repo: $REPO_LINE" >> "$log"
-	else
-		echo "FreePBX repo already exists: $REPO_LINE" >> "$log"
-	fi
-
-	if [ -z "$noaac" ]; then
-	     # Add main Bookworm repo if missing
-	     REPO_LINE="deb $DEBIAN_MIRROR bookworm main non-free non-free-firmware"
-
-	     # Only add if the line doesn't already exist
-	     if ! grep -qsF "$REPO_LINE" "$REPO_FILE"; then
-		     echo "$REPO_LINE" | tee -a "$REPO_FILE" >> "$log"
-		     echo "Added Bookworm main repo: $REPO_LINE" >> "$log"
-	     else
-		     echo "Bookworm main repo already exists: $REPO_LINE" >> "$log"
-	     fi			
-
-	    # Fix current debian repo to point to bookworm
-	    fix_debian12_repo
-	    # Block Debian 13/Trixie update because currently FreePBX only supports Debian 12/Bookworm 
-	    block_debian13_trixie_update
-	fi
-
-	apt-get update >> "$log"
-
-	setCurrentStep "Setting up Sangoma repository"
-    local aptpref="/etc/apt/preferences.d/99sangoma-fpbx-repository"
-    cat <<EOF> $aptpref
-Package: *
-Pin: origin deb.freepbx.org
-Pin-Priority: ${MIRROR_PRIO}
-EOF
-    if [ "$noaac" ]; then
-    cat <<EOF>> $aptpref
-
-Package: ffmpeg
-Pin: origin deb.freepbx.org
-Pin-Priority: 1
-EOF
+    # Добавляем репозиторий, если его ещё нет
+    if ! grep -qsF "$REPO_LINE" "$REPO_FILE" 2>/dev/null; then
+        echo "$REPO_LINE" | tee -a "$REPO_FILE" >> "$log"
+        echo "Added FreePBX repo: $REPO_LINE" >> "$log"
+    else
+        echo "FreePBX repo already exists: $REPO_LINE" >> "$log"
     fi
+
+    # Импортируем GPG-ключ для зеркала
+    wget -O - http://git.freepbx.asterisk.ru/gpg/aptly-pubkey.asc | gpg --dearmor --yes -o /etc/apt/trusted.gpg.d/freepbx.gpg >> "$log"
+
+    # Основные репозитории Debian (если нужно)
+    if [ -z "$noaac" ]; then
+        REPO_LINE="deb $DEBIAN_MIRROR bookworm main non-free non-free-firmware"
+        if ! grep -qsF "$REPO_LINE" "$REPO_FILE"; then
+            echo "$REPO_LINE" | tee -a "$REPO_FILE" >> "$log"
+            echo "Added Bookworm main repo: $REPO_LINE" >> "$log"
+        else
+            echo "Bookworm main repo already exists: $REPO_LINE" >> "$log"
+        fi
+
+        fix_debian12_repo
+        block_debian13_trixie_update
+    fi
+
+    apt-get update >> "$log"
+
+    setCurrentStep "Setting up Sangoma repository"
+    # Удаляем или комментируем создание файла с приоритетами для deb.freepbx.org, так как он больше не нужен
+    # local aptpref="/etc/apt/preferences.d/99sangoma-fpbx-repository"
+    # cat <<EOF> $aptpref ...
 }
 
-#create post apt run script to run and check everything apt command is finished executing
-create_post_apt_script() {
-    #checking post-apt-run script
-    if [ -e "/usr/bin/post-apt-run" ]; then
-        rm -f /usr/bin/post-apt-run
-    fi
-
-    message "Creating script to run post every apt command is finished executing"
-    {
-        echo "#!/bin/bash"
-        echo ""
-        echo "if pidof -x 'asterisk-version-switch' > /dev/null; then"
-	echo "echo \"Asterisk version switch process is running, skipping post-apt script.\""
-	echo "exit 0"
-	echo "fi"
-	echo ""
-        echo "dahdi_pres=\$(dpkg -l | grep dahdi-linux | wc -l)"
-        echo ""
-        echo "if [[ \$dahdi_pres -gt 0 ]]; then"
-	echo "    kernel_idx=\$(grep -v '^#' /etc/default/grub | grep GRUB_DEFAULT | cut -d '=' -f2 | tr -d '\"')"
-	echo ""
-	echo "    # Check if it contains '>'"
-	echo "    if [[ \"\$kernel_idx\" == *\">\"* ]]; then"
-	echo "        # Extract the value after '>'"
-	echo "        selected_idx=\"\${kernel_idx#*>}\""
-	echo "        submenu_format=true"
-	echo "    else"
-	echo "        # It's a numeric index, use it directly"
-	echo "        selected_idx=\"\$kernel_idx\""
-	echo "        submenu_format=false"
-	echo "    fi"
-	echo ""
-	echo "    kernel_pres=\$(grep -oP \"menuentry '.*?Linux \K[0-9.-]+(?=-amd64)\" /boot/grub/grub.cfg)"
-	echo "    kernel_count=\$(echo \"\$kernel_pres\" | wc -l)"
-	echo ""
-	echo "    if [[ \"\$selected_idx\" -ge \"\$kernel_count\" ]]; then"
-	echo "        if \$submenu_format; then"
-	echo "            echo \"ERROR: GRUB_DEFAULT is set to '\$kernel_idx' (submenu index: \$selected_idx), but only \$kernel_count kernel entries are available.\""
-	echo "            echo \"       This likely refers to a non-existent kernel inside a submenu (e.g., 'Advanced options for Debian GNU/Linux').\""
-        echo "            echo \"       Please update /etc/default/grub to a valid submenu index between 0 and \$((kernel_count - 1)), then run: update-grub\""
-	echo "        else"
-	echo "            echo \"ERROR: GRUB_DEFAULT is set to '\$selected_idx', but only \$kernel_count kernel entries were found.\""
-	echo "            echo \"       Valid indices are between 0 and \$((kernel_count - 1)).\""
-	echo "            echo \"       Please update /etc/default/grub and run: update-grub\""
-	echo "        fi"
-	echo "        exit 1"
-	echo "    fi"
-	echo ""
-	echo "    idx=0"
-        echo "    for kernel in \$kernel_pres; do"
-        echo "        if [[ \$idx -ne \$selected_idx ]]; then"
-        echo "            idx=\$((idx+1))"
-        echo "            continue"
-        echo "        fi"
-        echo ""
-        echo "        logger \"Checking kernel modules for dahdi and wanpipe for kernel image \$kernel\""
-        echo ""
-        echo "        #check if dahdi is installed or not of respective kernel version"
-        echo "        dahdi_kmod_pres=\$(dpkg -l | grep dahdi-linux-kmod | grep \$kernel | wc -l)"
-        echo "        wanpipe_kmod_pres=\$(dpkg -l | grep kmod-wanpipe | grep \$kernel | wc -l)"
-        echo ""
-        echo "        if [[ \$dahdi_kmod_pres -eq 0 ]] && [[ \$wanpipe_kmod_pres -eq 0 ]]; then"
-        echo "            logger \"Upgrading dahdi-linux-kmod-\$kernel and kmod-wanpipe-\$kernel\""
-        echo "            echo \"Please wait for approx 2 min once apt command execution is completed as dahdi-linux-kmod-\$kernel kmod-wanpipe-\$kernel update in progress\""
-        echo "            apt -y upgrade dahdi-linux-kmod-\$kernel kmod-wanpipe-\$kernel > /dev/null 2>&1 | at now +1 minute&"
-        echo "        elif [[ \$dahdi_kmod_pres -eq 0 ]]; then"
-        echo "            logger \"Upgrading dahdi-linux-kmod-\$kernel\""
-        echo "            echo \"Please wait for approx 2 min once apt command execution is completed as dahdi-linux-kmod-\$kernel update in progress\""
-        echo "            apt -y upgrade dahdi-linux-kmod-\$kernel > /dev/null 2>&1 | at now +1 minute&"
-        echo "        elif [[ \$wanpipe_kmod_pres -eq 0 ]];then"
-        echo "            logger \"Upgrading kmod-wanpipe-\$kernel\""
-        echo "            echo \"Please wait for approx 2 min once apt command execution is completed as kmod-wanpipe-\$kernel update in progress\""
-        echo "            apt -y upgrade kmod-wanpipe-\$kernel > /dev/null 2>&1 | at now +1 minute&"
-        echo "        fi"
-        echo ""
-        echo "        break"
-        echo "    done"
-        echo "else"
-        echo "    logger \"Dahdi / wanpipe is not present therefore, not checking for dahdi / wanpipe kmod upgrade\""
-        echo "fi"
-        echo ""
-        echo "if [ -e "/var/www/html/index.html" ]; then"
-        echo "    rm -f /var/www/html/index.html"
-        echo "fi"
-    } >> /usr/bin/post-apt-run
-
-    #Changing file permission to run script
-    chmod 755 /usr/bin/post-apt-run
-
-    #Adding Post Invoke for Update to run kernel-check
-    if [ -e "/etc/apt/apt.conf.d/80postaptcmd" ]; then
-        rm -f /etc/apt/apt.conf.d/80postaptcmd
-    fi
-
-    echo "DPkg::Post-Invoke {\"/usr/bin/post-apt-run\";};" >> /etc/apt/apt.conf.d/80postaptcmd
-    chmod 644 /etc/apt/apt.conf.d/80postaptcmd
-}
 
 check_kernel_compatibility() {
     local latest_dahdi_supported_version=$(apt-cache search dahdi | grep -E "^dahdi-linux-kmod-[0-9]" | awk '{print $1}' | awk -F'-' '{print $4"-"$5}' | sort -n | tail -1)
@@ -1205,12 +1086,26 @@ fi
 
 # Install Asterisk
 if [ "$noast" ] ; then
-	message "Skipping Asterisk installation due to noasterisk option"
+    message "Skipping Asterisk installation due to noasterisk option"
 else
-	# TODO Need to check if asterisk installed already then remove that and install new ones.
-	# Install Asterisk
-	setCurrentStep "Installing Asterisk packages."
-	install_asterisk $ASTVERSION
+    setCurrentStep "Installing Asterisk packages."
+    # Try to install via apt first (if package is available)
+    if apt-get install -y asterisk; then
+        message "Asterisk installed successfully via APT."
+    else
+        message "APT installation failed. Falling back to building from source."
+        cd /usr/src
+        git clone -b 22 https://github.com/asterisk/asterisk.git asterisk-22
+        cd asterisk-22
+        ./contrib/scripts/install_prereq install
+        ./configure --libdir=/usr/lib64 --with-pjproject-bundled
+        make menuselect.makeopts
+        make menuselect
+        make
+        make install
+        make config
+        ldconfig
+    fi
 fi
 
 # Install PBX dependent packages
