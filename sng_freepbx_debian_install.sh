@@ -30,7 +30,7 @@ LOG_FOLDER="/var/log/pbx"
 LOG_FILE="${LOG_FOLDER}/freepbx17-install-$(date '+%Y.%m.%d-%H.%M.%S').log"
 log=$LOG_FILE
 SANE_PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-DEBIAN_MIRROR="https://yandex.ru"
+DEBIAN_MIRROR="https://mirror.yandex.ru/debian/"
 NPM_MIRROR=""
 DEBIAN_OS_VERSION=""
 
