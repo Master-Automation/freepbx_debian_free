@@ -8,30 +8,29 @@
 |_|  |_|  \___|\___|_|    |____/_/ \_\
 Your Open Source Asterisk PBX GUI Solution
 ```
-# Адаптированный скрипт установки FreePBX 17 для Debian 12
+# FreePBX 17 Installer for Debian 12 (Russian Edition)
 
-Данный скрипт является модифицированной версией официального установщика FreePBX. 
-Он адаптирован для стабильной работы в российских сетях, использует локальные зеркала и не требует установки драйверов DAHDI (подходит только для IP-телефонии).
+Автоматический скрипт для установки **FreePBX 17** на чистую систему **Debian 12 (Bookworm)** с учётом российских зеркал и исправлением типичных ошибок (библиотека `libasteriskssl`, настройка Apache, запуск systemd, удаление коммерческих модулей).
 
-## Особенности
+## 🚀 Особенности
 
-- Использует российские зеркала Debian (mirror.yandex.ru) и FreePBX (git.freepbx.asterisk.ru).
-- Не устанавливает пакет `libtonezone` и драйверы DAHDI (избегает ошибок в Debian 12).
-- Собирает Asterisk 22 из исходных кодов (обход проблем с репозиторием).
-- Удаляет коммерческие модули (флаг `--opensourceonly`).
-- Подходит для чистой IP-телефонии без аналоговых плат.
+- Использует **российские зеркала** Debian (`mirror.yandex.ru`) и FreePBX (`git.freepbx.asterisk.ru`).
+- Собирает **Asterisk 22** из исходников (обход проблем с `deb.freepbx.org`).
+- Автоматически копирует `libasteriskssl.so.1` и настраивает `ld.so.conf.d` (избавляет от ошибки `cannot open shared object file`).
+- Включает модули Apache (`expires`, `headers`, `rewrite`), отключает стандартный сайт, активирует `freepbx.conf`.
+- Настраивает автозапуск `asterisk` и `freepbx` через systemd.
+- Удаляет коммерческие модули (флаг `--opensourceonly`) без прерывания установки.
+- Выводит понятные сообщения на русском (или английском) языке.
 
-## Требования
+## 📦 Требования
 
-- Чистая установка Debian 12 (Bookworm) (минимальная, без графического окружения).
-- Доступ в интернет (для загрузки исходников и пакетов).
-- Права root.
+- **Debian 12 (Bookworm)**, минимальная установка (без графического окружения).
+- Доступ в интернет (для скачивания исходников и пакетов).
+- Права `root` (скрипт запускается через `sudo`).
+- Рекомендуемый объём ОЗУ: **от 2 ГБ** (4 ГБ для комфортной работы веб-интерфейса).
 
-## Установка
+## ⚙️ Установка
 
-Скачайте скрипт и запустите его от root:
-
-```bash
-curl -O https://raw.githubusercontent.com/Master-Automation/sng_freepbx_debian_install/master/russian.sh
-chmod +x russian.sh
-sudo ./russian.sh --skipversion --opensourceonly
+1. **Скачайте скрипт** (например, в домашнюю папку):
+   ```bash
+   wget https://raw.githubusercontent.com/Master-Automation/sng_freepbx_debian_install/master/russian.sh
