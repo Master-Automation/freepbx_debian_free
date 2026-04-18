@@ -351,6 +351,7 @@ cat > /etc/apache2/sites-available/freepbx.conf <<'EOF'
     CustomLog ${APACHE_LOG_DIR}/freepbx-access.log combined
 </VirtualHost>
 EOF
+
 a2enmod ssl expires headers rewrite
 a2dissite 000-default.conf 2>/dev/null || true
 a2ensite freepbx.conf
