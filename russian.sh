@@ -1,10 +1,10 @@
 #!/bin/bash
 #####################################################################################
 # Адаптированный скрипт установки FreePBX 17 на Debian 12
-# Версия: 2.2 (с исправлением модулей, русским языком, обновлением)
+# Версия: 3.0 (с расширенной обработкой ошибок и подсказками)
 #####################################################################################
 set -e
-SCRIPTVER="2.2"
+SCRIPTVER="3.0"
 ASTVERSION=${ASTVERSION:-22}
 PHPVERSION="8.2"
 LOG_FOLDER="/var/log/pbx"
@@ -83,11 +83,56 @@ terminate() {
     rm -f "$pidfile"
     message "Скрипт завершён."
 }
+
+# Расширенный обработчик ошибок с подсказками
 errorHandler() {
+    local line=$1
+    local code=$2
+    local cmd=$3
     log "****** INSTALLATION FAILED *****"
-    echo_ts "Ошибка на шаге: ${currentStep}. Подробности в логе: ${LOG_FILE}"
-    log "Error at line: $1 exiting with code $2 (last command was: $3)"
-    exit "$2"
+    echo_ts "Ошибка на шаге: ${currentStep} (строка $line, код $code)"
+    echo_ts "Последняя команда: $cmd"
+    echo_ts "Подробности в логе: ${LOG_FILE}"
+    
+    case "${currentStep}" in
+        "Настройка репозиториев")
+            echo_ts "Возможная причина: проблемы с сетью или недоступность зеркал."
+            echo_ts "Проверьте интернет-соединение: ping -c 4 git.freepbx.asterisk.ru"
+            echo_ts "Если зеркало недоступно, замените REPO_URL в скрипте на другое."
+            ;;
+        "Установка зависимостей")
+            echo_ts "Возможная причина: отсутствуют некоторые пакеты или конфликт версий."
+            echo_ts "Попробуйте выполнить вручную: apt-get update && apt-get install -f"
+            echo_ts "Затем перезапустите скрипт."
+            ;;
+        "Установка Asterisk")
+            echo_ts "Возможная причина: не хватает места на диске или отсутствуют компиляторы."
+            echo_ts "Проверьте свободное место: df -h /usr/src"
+            echo_ts "Установите build-essential: apt-get install -y build-essential"
+            ;;
+        "Установка FreePBX")
+            echo_ts "Возможная причина: сбой при загрузке пакетов из репозитория."
+            echo_ts "Проверьте репозиторий: apt-cache policy freepbx17"
+            echo_ts "Если ключ GPG устарел, выполните: wget -O - http://git.freepbx.asterisk.ru/gpg/aptly-pubkey.asc | apt-key add -"
+            ;;
+        "Перезагрузка FreePBX")
+            echo_ts "Возможная причина: Asterisk не запущен или сокет недоступен."
+            echo_ts "Проверьте статус: systemctl status asterisk"
+            echo_ts "Запустите вручную: systemctl start asterisk && fwconsole start"
+            ;;
+        "Настройка веб-сервера Apache")
+            echo_ts "Возможная причина: ошибка в конфигурации или порт 80 занят."
+            echo_ts "Проверьте синтаксис: apachectl configtest"
+            echo_ts "Посмотрите логи: tail -20 /var/log/apache2/error.log"
+            ;;
+        *)
+            echo_ts "Общие рекомендации:"
+            echo_ts "1. Проверьте наличие свободного места на диске: df -h"
+            echo_ts "2. Проверьте интернет-соединение: ping -c 4 ya.ru"
+            echo_ts "3. Посмотрите полный лог: cat ${LOG_FILE}"
+            ;;
+    esac
+    exit "$code"
 }
 trap 'errorHandler "$LINENO" "$?" "$BASH_COMMAND"' ERR
 trap "terminate" EXIT
@@ -176,6 +221,25 @@ setup_russian_locale() {
     export LANG=ru_RU.UTF-8
     export LC_ALL=ru_RU.UTF-8
     message "Русская локаль установлена."
+}
+
+# Безопасная перезагрузка FreePBX с проверкой
+safe_fwconsole_reload() {
+    message "Выполняется: fwconsole reload"
+    fwconsole reload
+    if [ $? -eq 0 ]; then
+        sleep 3
+        if asterisk -rx "core show version" > /dev/null 2>&1; then
+            message "fwconsole reload выполнен успешно, Asterisk отвечает."
+            return 0
+        else
+            message "ОШИБКА: fwconsole reload завершился, но Asterisk не отвечает!"
+            return 1
+        fi
+    else
+        message "ОШИБКА: Не удалось выполнить fwconsole reload."
+        return 1
+    fi
 }
 
 # ===========================
@@ -273,14 +337,17 @@ pkg_install freepbx17
 # Удаление коммерческих модулей (оставляем только нужные)
 if [ "$opensourceonly" ]; then
     setCurrentStep "Удаление ненужных коммерческих модулей"
-    # Оставляем sysadmin17, firewall, customcontexts, удаляем остальные коммерческие модули
-    fwconsole ma list | awk '/Commercial/ {print $2}' | grep -v -E "sysadmin17|firewall|customcontexts" | xargs -t -I {} fwconsole ma -f remove {} >> "$log" 2>&1 || true
-    message "Ненужные коммерческие модули удалены. Модули Sysadmin, Firewall и Custom Contexts оставлены."
+    modules_to_remove=$(fwconsole ma list | awk '/Commercial/ {print $2}' | grep -v -E "sysadmin17|firewall|customcontexts")
+    if [ -n "$modules_to_remove" ]; then
+        echo "$modules_to_remove" | xargs -t -I {} fwconsole ma -f remove {} >> "$log" 2>&1 || true
+        message "Ненужные коммерческие модули удалены. Модули Sysadmin, Firewall и Custom Contexts оставлены."
+    else
+        message "Коммерческие модули для удаления не найдены."
+    fi
 fi
 
 setCurrentStep "Перезагрузка FreePBX"
-fwconsole reload >> "$log"
-fwconsole restart >> "$log"
+safe_fwconsole_reload
 
 # Настройка Apache
 setCurrentStep "Настройка веб-сервера Apache"
@@ -289,6 +356,12 @@ a2dissite 000-default.conf 2>/dev/null || true
 a2ensite freepbx.conf
 rm -f /var/www/html/index.html
 systemctl restart apache2
+if [ $? -ne 0 ]; then
+    message "Ошибка при перезапуске Apache."
+    message "Проверьте конфигурацию: apachectl configtest"
+    message "Посмотрите логи: journalctl -u apache2 -n 20"
+    exit 1
+fi
 
 # Настройка автозапуска
 systemctl enable asterisk
@@ -340,13 +413,6 @@ fwconsole ma upgradeall >> "$log" 2>&1 || message "Некоторые модул
 # Перезагрузка конфигурации и прав
 fwconsole reload >> "$log"
 fwconsole chown >> "$log"
-
-# Дополнительно: переустановка модуля framework, если он повреждён
-if fwconsole ma list | grep -q "framework.*Unknown"; then
-    message "Переустановка модуля framework для исправления повреждений..."
-    fwconsole ma downloadinstall framework --force >> "$log" 2>&1
-    fwconsole reload >> "$log"
-fi
 
 # Финальное сообщение
 execution_time="$(($(date +%s) - start))"
