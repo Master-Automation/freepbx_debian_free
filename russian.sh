@@ -1,10 +1,10 @@
 #!/bin/bash
 #####################################################################################
 # Адаптированный скрипт установки FreePBX 17 на Debian 12
-# Исправлены проблемы: libasteriskssl.so.1, systemd, коммерческие модули
+# Версия: 2.2 (с исправлением модулей, русским языком, обновлением)
 #####################################################################################
 set -e
-SCRIPTVER="1.16"
+SCRIPTVER="2.2"
 ASTVERSION=${ASTVERSION:-22}
 PHPVERSION="8.2"
 LOG_FOLDER="/var/log/pbx"
@@ -13,65 +13,56 @@ log=$LOG_FILE
 SANE_PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 DEBIAN_MIRROR="https://mirror.yandex.ru/debian/"
 NPM_MIRROR=""
-DEBIAN_OS_VERSION=""
 
+# Проверка ОС
 if [ -f /etc/os-release ]; then
     DEBIAN_OS_VERSION=$(grep -oP '(?<=VERSION_CODENAME=).*' /etc/os-release)
-fi
-
-if [ -z "$DEBIAN_OS_VERSION" ] && [ -f /etc/debian_version ]; then
-    case "$(cat /etc/debian_version)" in
-        12*|bookworm)
-            DEBIAN_OS_VERSION="bookworm"
-            ;;
-        13*|trixie)
-            DEBIAN_OS_VERSION="trixie"
-            ;;
-        *)
-            DEBIAN_OS_VERSION="unknown"
-            ;;
-    esac
+else
+    DEBIAN_OS_VERSION="bookworm"
 fi
 
 if [ "$DEBIAN_OS_VERSION" != "bookworm" ]; then
-    echo "Unsupported OS version. This script supports only Debian 12 (bookworm). Detected: $DEBIAN_OS_VERSION"
+    echo "Поддерживается только Debian 12 (bookworm). Обнаружено: $DEBIAN_OS_VERSION"
     exit 1
 fi
 
 if [[ $EUID -ne 0 ]]; then
-   echo "This script must be run as root"
+   echo "Скрипт должен запускаться с правами root (sudo)."
    exit 1
 fi
 
 export PATH=$SANE_PATH
 
+# Парсинг параметров
 while [[ $# -gt 0 ]]; do
-	case $1 in
-		--skipversion) skipversion=true; shift ;;
-		--opensourceonly) opensourceonly=true; shift ;;
-		--nochrony) nochrony=true; shift ;;
-		--debianmirror) DEBIAN_MIRROR=$2; shift; shift ;;
-		*) shift ;;
-	esac
+    case $1 in
+        --skipversion) skipversion=true; shift ;;
+        --opensourceonly) opensourceonly=true; shift ;;
+        --nochrony) nochrony=true; shift ;;
+        --debianmirror) DEBIAN_MIRROR=$2; shift; shift ;;
+        *) shift ;;
+    esac
 done
 
+# Блокировка обновления до Debian 13
 block_debian13_trixie_update() {
-	cat >/etc/apt/preferences.d/99-block-trixie.pref <<'EOF'
+    cat >/etc/apt/preferences.d/99-block-trixie.pref <<'EOF'
 Package: *
 Pin: release n=trixie
 Pin-Priority: -1
 EOF
 }
 
+# Фикс репозиториев Debian
 fix_debian12_repo() {
-	for file in /etc/apt/sources.list /etc/apt/sources.list.d/*.list; do
-		[ -f "$file" ] || continue
-		if grep -qE "deb\s+$DEBIAN_MIRROR\s+stable\b" "$file"; then
-			sed -i.bak -E "s|(deb\s+$DEBIAN_MIRROR\s+)stable\b|\1bookworm|g" "$file"
-		fi
-	    if grep -qE "deb\s+http://security\.debian\.org/debian-security\s+stable-security\b" "$file"; then
-		    sed -i.bak -E "s|(deb\s+http://security\.debian\.org/debian-security\s+)stable-security\b|\1bookworm-security|g" "$file"
-	    fi
+    for file in /etc/apt/sources.list /etc/apt/sources.list.d/*.list; do
+        [ -f "$file" ] || continue
+        if grep -qE "deb\s+$DEBIAN_MIRROR\s+stable\b" "$file"; then
+            sed -i.bak -E "s|(deb\s+$DEBIAN_MIRROR\s+)stable\b|\1bookworm|g" "$file"
+        fi
+        if grep -qE "deb\s+http://security\.debian\.org/debian-security\s+stable-security\b" "$file"; then
+            sed -i.bak -E "s|(deb\s+http://security\.debian\.org/debian-security\s+)stable-security\b|\1bookworm-security|g" "$file"
+        fi
     done
 }
 
@@ -79,95 +70,92 @@ mkdir -p "${LOG_FOLDER}"
 touch "${LOG_FILE}"
 exec 2>>"${LOG_FILE}"
 
-compare_version() {
-        if dpkg --compare-versions "$1" "gt" "$2"; then result=0
-        elif dpkg --compare-versions "$1" "lt" "$2"; then result=1
-        else result=2
-        fi
-}
-
-check_version() { return 0; }
-
 echo_ts() { echo "$(date +"%Y-%m-%d %T") - $*"; }
 log() { echo_ts "$*" >> "$LOG_FILE"; }
 message() { echo_ts "$*" | tee -a "$LOG_FILE"; }
 setCurrentStep () { currentStep="$1"; message "${currentStep}"; }
 
 terminate() {
-	if [ $? -ne 0 ]; then
-		echo_ts "Displaying last 10 lines from the log file"
-		tail -n 10 "$LOG_FILE"
-	fi
-	rm -f "$pidfile"
-	message "Exiting script"
+    if [ $? -ne 0 ]; then
+        echo_ts "Последние 10 строк лога:"
+        tail -n 10 "$LOG_FILE"
+    fi
+    rm -f "$pidfile"
+    message "Скрипт завершён."
 }
 errorHandler() {
-	log "****** INSTALLATION FAILED *****"
-	echo_ts "Installation failed at step ${currentStep}. Please check log ${LOG_FILE} for details."
-	log "Error at line: $1 exiting with code $2 (last command was: $3)"
-	exit "$2"
+    log "****** INSTALLATION FAILED *****"
+    echo_ts "Ошибка на шаге: ${currentStep}. Подробности в логе: ${LOG_FILE}"
+    log "Error at line: $1 exiting with code $2 (last command was: $3)"
+    exit "$2"
 }
+trap 'errorHandler "$LINENO" "$?" "$BASH_COMMAND"' ERR
+trap "terminate" EXIT
 
 isinstalled() {
-	PKG_OK=$(dpkg-query -W --showformat='${Status}\n' "$@" 2>/dev/null|grep "install ok installed")
-	if [ "" = "$PKG_OK" ]; then false; else true; fi
+    PKG_OK=$(dpkg-query -W --showformat='${Status}\n' "$@" 2>/dev/null|grep "install ok installed")
+    [ -n "$PKG_OK" ]
 }
 
 pkg_install() {
     log "############################### "
     PKG=("$@")
     if isinstalled "${PKG[@]}"; then
-        log "${PKG[*]} already present ...."
+        log "${PKG[*]} уже установлен."
     else
-        message "Installing ${PKG[*]} ...."
+        message "Установка ${PKG[*]} ...."
         apt-get -y --ignore-missing -o DPkg::Options::="--force-confnew" -o Dpkg::Options::="--force-overwrite" install "${PKG[@]}" >> "$log"
         if isinstalled "${PKG[@]}"; then
-            message "${PKG[*]} installed successfully...."
+            message "${PKG[*]} установлен успешно."
         else
-            message "${PKG[*]} failed to install ...."
-            message "Exiting the installation process as dependent ${PKG[*]} failed to install ...."
+            message "Не удалось установить ${PKG[*]}. Прерывание."
             terminate
         fi
     fi
     log "############################### "
 }
 
+# Установка Asterisk из исходников (с исправлением библиотеки)
 install_asterisk() {
     astver=$1
-    message "Building Asterisk ${astver} from source (standard for Debian 12). This may take 20-40 minutes."
+    message "=== Сборка Asterisk ${astver} из исходников (обычно для Debian 12). Это займёт 20-40 минут. ==="
     mkdir -p /usr/src
     cd /usr/src
     if [ -d "asterisk-${astver}" ]; then
-        message "Removing old Asterisk source directory..."
+        message "Удаляем старый каталог исходников..."
         rm -rf asterisk-${astver}
     fi
     git clone -b ${astver} https://github.com/asterisk/asterisk.git asterisk-${astver}
     cd asterisk-${astver}
+    message "Установка зависимостей для сборки..."
     ./contrib/scripts/install_prereq install
+    message "Конфигурация Asterisk..."
     ./configure --libdir=/usr/lib64 --with-pjproject-bundled
     make menuselect.makeopts
     menuselect/menuselect --enable chan_pjsip --enable res_srtp --enable res_http_websocket --enable codec_opus --enable codec_g729a --enable format_mp3
+    message "Компиляция Asterisk (самый долгий этап)..."
     make -j2
     make install
     make config
     ldconfig
-    # Fix library path
-    cp /usr/src/asterisk-${astver}/main/libasteriskssl.so.1 /usr/lib64/
-    echo "/usr/lib64" > /etc/ld.so.conf.d/asterisk.conf
-    ldconfig
-    message "Asterisk ${astver} installed successfully from source."
+    if [ -f /usr/src/asterisk-${astver}/main/libasteriskssl.so.1 ]; then
+        cp /usr/src/asterisk-${astver}/main/libasteriskssl.so.1 /usr/lib64/
+        echo "/usr/lib64" > /etc/ld.so.conf.d/asterisk.conf
+        ldconfig
+        message "Библиотека libasteriskssl.so.1 скопирована и зарегистрирована."
+    else
+        message "ВНИМАНИЕ: libasteriskssl.so.1 не найдена. Возможны проблемы с запуском Asterisk."
+    fi
+    message "Asterisk ${astver} успешно собран и установлен."
 }
 
+# Настройка репозиториев
 setup_repositories() {
-    # Use Russian mirror for FreePBX
-    REPO_URL="http://git.freepbx.asterisk.ru/freepbx17-prod"
-    REPO_LINE="deb [arch=amd64] $REPO_URL bookworm main"
-    if ! grep -qsF "$REPO_LINE" /etc/apt/sources.list; then
-        echo "$REPO_LINE" | tee -a /etc/apt/sources.list >> "$log"
-        message "Added FreePBX repo: $REPO_LINE"
+    message "Настройка репозиториев..."
+    if ! grep -qsF "deb [arch=amd64] http://git.freepbx.asterisk.ru/freepbx17-prod bookworm main" /etc/apt/sources.list; then
+        echo "deb [arch=amd64] http://git.freepbx.asterisk.ru/freepbx17-prod bookworm main" | tee -a /etc/apt/sources.list >> "$log"
     fi
     wget -O - http://git.freepbx.asterisk.ru/gpg/aptly-pubkey.asc | gpg --dearmor --yes -o /etc/apt/trusted.gpg.d/freepbx.gpg >> "$log"
-    # Debian main repo
     if ! grep -qsF "deb $DEBIAN_MIRROR bookworm main" /etc/apt/sources.list; then
         echo "deb $DEBIAN_MIRROR bookworm main non-free non-free-firmware" | tee -a /etc/apt/sources.list >> "$log"
     fi
@@ -176,19 +164,36 @@ setup_repositories() {
     apt-get update >> "$log"
 }
 
-setCurrentStep "Starting installation."
-trap 'errorHandler "$LINENO" "$?" "$BASH_COMMAND"' ERR
-trap "terminate" EXIT
+# Генерация русской локали в системе
+setup_russian_locale() {
+    message "Настройка русской локали в системе..."
+    apt-get install -y locales >> "$log"
+    if ! grep -q "^ru_RU.UTF-8" /etc/locale.gen; then
+        echo "ru_RU.UTF-8 UTF-8" >> /etc/locale.gen
+    fi
+    locale-gen >> "$log"
+    update-locale LANG=ru_RU.UTF-8 LC_ALL=ru_RU.UTF-8 >> "$log"
+    export LANG=ru_RU.UTF-8
+    export LC_ALL=ru_RU.UTF-8
+    message "Русская локаль установлена."
+}
 
+# ===========================
+# Основной процесс установки
+# ===========================
+pidfile='/var/run/freepbx17_installer.pid'
+echo "$$" > "$pidfile"
+
+setCurrentStep "Начало установки FreePBX 17"
 start=$(date +%s)
-message "  Starting FreePBX 17 installation process for $(hostname) $(uname -a)"
-message "  Please refer to the $log to know the process..."
+message "Система: $(hostname) $(uname -a)"
+message "Лог установки: $log"
 
-setCurrentStep "Making sure installation is sane"
+setCurrentStep "Проверка и подготовка системы"
 apt-get -y --fix-broken install >> "$log"
 apt-get autoremove -y >> "$log"
 
-setCurrentStep "Setting up default configuration"
+setCurrentStep "Настройка параметров по умолчанию"
 debconf-set-selections <<EOF
 iptables-persistent iptables-persistent/autosave_v4 boolean true
 iptables-persistent iptables-persistent/autosave_v6 boolean true
@@ -198,13 +203,13 @@ echo "postfix postfix/main_mailer_type string 'Internet Site'" | debconf-set-sel
 
 pkg_install gnupg
 
-setCurrentStep "Setting up repositories"
+setCurrentStep "Настройка репозиториев"
 setup_repositories
 
-setCurrentStep "Updating repository"
+setCurrentStep "Обновление списка пакетов"
 apt-get update >> "$log"
 
-setCurrentStep "Installing required packages"
+setCurrentStep "Установка зависимостей (это может занять несколько минут)"
 DEPPRODPKGS=(
     "redis-server" "ghostscript" "libtiff-tools" "iptables-persistent" "net-tools"
     "rsyslog" "libavahi-client3" "nmap" "apache2" "zip" "incron" "wget" "vim"
@@ -234,88 +239,121 @@ if [ "$nochrony" != true ]; then
     pkg_install chrony
 fi
 
-setCurrentStep "Removing unnecessary packages"
+setCurrentStep "Очистка"
 apt-get autoremove -y >> "$log"
 execution_time="$(($(date +%s) - start))"
-message "Execution time to install all the dependent packages : $execution_time s"
+message "Время установки зависимостей: $execution_time с"
 
-setCurrentStep "Setting up folders and asterisk config"
+setCurrentStep "Настройка каталогов и прав"
 groupadd -r asterisk 2>/dev/null || true
 useradd -r -g asterisk -d /home/asterisk -M -s /bin/bash asterisk 2>/dev/null || true
-mkdir -p /tftpboot
-chown -R asterisk:asterisk /tftpboot
+mkdir -p /tftpboot /var/lib/asterisk/sounds
+chown -R asterisk:asterisk /tftpboot /var/lib/asterisk
 sed -i -e "s|^TFTP_DIRECTORY=\"/srv\/tftp\"$|TFTP_DIRECTORY=\"/tftpboot\"|" /etc/default/tftpd-hpa
 systemctl unmask tftpd-hpa.service
 systemctl start tftpd-hpa.service
 
-mkdir -p /var/lib/asterisk/sounds
-chown -R asterisk:asterisk /var/lib/asterisk
-
-# Install Asterisk
-if [ "$noast" ]; then
-    message "Skipping Asterisk installation due to noasterisk option"
-else
-    setCurrentStep "Installing Asterisk packages."
+# Установка Asterisk
+if [ -z "$noast" ]; then
+    setCurrentStep "Установка Asterisk"
     install_asterisk $ASTVERSION
 fi
 
-# Install FreePBX packages
-setCurrentStep "Installing FreePBX packages"
+setCurrentStep "Установка пакетов FreePBX"
 pkg_install sysadmin17 sangoma-pbx17 ffmpeg
 
-setCurrentStep "Enabling modules"
+setCurrentStep "Настройка PHP и модулей"
 phpenmod freepbx
 mkdir -p /var/lib/php/session
 
-setCurrentStep "Installing FreePBX 17"
+setCurrentStep "Установка FreePBX"
 pkg_install ioncube-loader-82
 pkg_install freepbx17
 
+# Удаление коммерческих модулей (оставляем только нужные)
 if [ "$opensourceonly" ]; then
-    setCurrentStep "Removing commercial modules"
-    fwconsole ma list | awk '/Commercial/ {print $2}' | xargs -t -I {} fwconsole ma -f remove {} >> "$log" || true
-    fwconsole ma -f remove firewall >> "$log" || true
-    apt-get purge -y sysadmin17 ioncube-loader-82 >> "$log" || true
+    setCurrentStep "Удаление ненужных коммерческих модулей"
+    # Оставляем sysadmin17, firewall, customcontexts, удаляем остальные коммерческие модули
+    fwconsole ma list | awk '/Commercial/ {print $2}' | grep -v -E "sysadmin17|firewall|customcontexts" | xargs -t -I {} fwconsole ma -f remove {} >> "$log" 2>&1 || true
+    message "Ненужные коммерческие модули удалены. Модули Sysadmin, Firewall и Custom Contexts оставлены."
 fi
 
-setCurrentStep "Reloading and restarting FreePBX"
+setCurrentStep "Перезагрузка FreePBX"
 fwconsole reload >> "$log"
 fwconsole restart >> "$log"
 
-setCurrentStep "Wrapping up the installation process"
-systemctl daemon-reload
-systemctl enable freepbx
-a2enmod ssl expires rewrite
+# Настройка Apache
+setCurrentStep "Настройка веб-сервера Apache"
+a2enmod ssl expires headers rewrite
+a2dissite 000-default.conf 2>/dev/null || true
 a2ensite freepbx.conf
-a2ensite default-ssl
+rm -f /var/www/html/index.html
+systemctl restart apache2
 
-# Fix Apache startup order
-systemctl edit --full freepbx.service <<EOF || true
+# Настройка автозапуска
+systemctl enable asterisk
+systemctl start asterisk
+systemctl enable freepbx
+
+# Исправление порядка запуска служб
+cat > /etc/systemd/system/freepbx.service <<EOF
 [Unit]
 After=mariadb.service network-online.target
 Wants=network-online.target
+
 [Service]
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/sbin/fwconsole start
 ExecStop=/usr/sbin/fwconsole stop
+
 [Install]
 WantedBy=multi-user.target
 EOF
-
 systemctl daemon-reload
-systemctl enable asterisk
-systemctl start asterisk
-systemctl restart apache2
 
-setCurrentStep "Holding packages"
+# Блокировка обновлений пакетов
 apt-mark hold sangoma-pbx17 nodejs node-* freepbx17 >> "$log"
 
-setCurrentStep "FreePBX 17 Installation finished successfully."
-execution_time="$(($(date +%s) - start))"
-message "Total script Execution Time: $execution_time"
-message "Finished FreePBX 17 installation process. You can now access the web interface at http://$(hostname -I | awk '{print $1}')"
+# ========== ДОПОЛНИТЕЛЬНЫЕ УЛУЧШЕНИЯ ==========
+setCurrentStep "Обновление подписей модулей и установка русского языка"
 
-if [ ! "$nofpbx" ] ; then
-  fwconsole motd
+# Обновление подписей (исправляет статус "Unknown/повреждён")
+fwconsole ma refreshsignatures >> "$log" 2>&1 || message "Не удалось обновить подписи (возможно, проблема с сетью)."
+
+# Генерация русской локали в ОС
+setup_russian_locale
+
+# Установка русского языка для FreePBX
+fwconsole setting set LANG ru_RU >> "$log" 2>&1
+fwconsole setting set LANGUAGE ru_RU >> "$log" 2>&1
+
+# Установка русских звуковых файлов (если доступны)
+if ! fwconsole ma downloadinstall soundlang --tag=ru_RU >> "$log" 2>&1; then
+    message "Не удалось установить русские звуки. Будут использованы английские."
 fi
+
+# Обновление всех модулей до актуальных версий
+message "Проверка и обновление модулей FreePBX (это может занять несколько минут)..."
+fwconsole ma upgradeall >> "$log" 2>&1 || message "Некоторые модули не обновились (возможно, из-за отсутствия лицензий)."
+
+# Перезагрузка конфигурации и прав
+fwconsole reload >> "$log"
+fwconsole chown >> "$log"
+
+# Дополнительно: переустановка модуля framework, если он повреждён
+if fwconsole ma list | grep -q "framework.*Unknown"; then
+    message "Переустановка модуля framework для исправления повреждений..."
+    fwconsole ma downloadinstall framework --force >> "$log" 2>&1
+    fwconsole reload >> "$log"
+fi
+
+# Финальное сообщение
+execution_time="$(($(date +%s) - start))"
+message "============================================"
+message "УСТАНОВКА ЗАВЕРШЕНА УСПЕШНО! Время: $execution_time с"
+message "Веб-интерфейс FreePBX доступен по адресу: http://$(hostname -I | awk '{print $1}')"
+message "Логин: admin, пароль задаётся при первом входе."
+message "Русский язык интерфейса и звуки установлены."
+message "============================================"
+fwconsole motd
