@@ -1089,24 +1089,33 @@ if [ "$noast" ] ; then
     message "Skipping Asterisk installation due to noasterisk option"
 else
     setCurrentStep "Installing Asterisk packages."
-    # Try to install via apt first (if package is available)
-    if apt-get install -y asterisk; then
-        message "Asterisk installed successfully via APT."
-    else
-        message "APT installation failed. Falling back to building from source."
-        cd /usr/src
-        git clone -b 22 https://github.com/asterisk/asterisk.git asterisk-22
-        cd asterisk-22
-        ./contrib/scripts/install_prereq install
-        ./configure --libdir=/usr/lib64 --with-pjproject-bundled
-        make menuselect.makeopts
-        make menuselect
-        make
-        make install
-        make config
-        ldconfig
+    message "Building Asterisk 22 from source (standard for Debian 12). This may take 20-40 minutes."
+    
+    mkdir -p /usr/src
+    cd /usr/src
+    
+    # Remove old source if exists
+    if [ -d "asterisk-22" ]; then
+        message "Removing old Asterisk source directory..."
+        rm -rf asterisk-22
     fi
+    
+    git clone -b 22 https://github.com/asterisk/asterisk.git asterisk-22
+    cd asterisk-22
+    
+    ./contrib/scripts/install_prereq install
+    ./configure --libdir=/usr/lib64 --with-pjproject-bundled
+    make menuselect.makeopts
+    
+    # Automatically enable common modules (no interactive menu)
+    menuselect/menuselect --enable chan_pjsip --enable res_srtp --enable res_http_websocket --enable codec_opus --enable codec_g729a --enable format_mp3
+    
+    make
+    make install
+    make config
+    ldconfig
 fi
+
 
 # Install PBX dependent packages
 setCurrentStep "Installing FreePBX packages"
