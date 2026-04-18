@@ -32,6 +32,6 @@ Your Open Source Asterisk PBX GUI Solution
 Скачайте скрипт и запустите его от root:
 
 ```bash
-wget https://raw.githubusercontent.com/Master-Automation/sng_freepbx_debian_install/master/russian.sh
+curl -O https://raw.githubusercontent.com/Master-Automation/sng_freepbx_debian_install/master/russian.sh
 chmod +x russian.sh
 sudo ./russian.sh --skipversion --opensourceonly
