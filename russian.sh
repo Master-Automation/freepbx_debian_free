@@ -11,7 +11,6 @@ LOG_FOLDER="/var/log/pbx"
 LOG_FILE="${LOG_FOLDER}/freepbx17-install-$(date '+%Y.%m.%d-%H.%M.%S').log"
 log=$LOG_FILE
 SANE_PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-DEBIAN_MIRROR="https://mirror.yandex.ru/debian/"
 NPM_MIRROR=""
 
 # Проверка ОС
@@ -44,45 +43,6 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Блокировка обновления до Debian 13
-block_debian13_trixie_update() {
-    cat >/etc/apt/preferences.d/99-block-trixie.pref <<'EOF'
-Package: *
-Pin: release n=trixie
-Pin-Priority: -1
-EOF
-}
-
-# Фикс репозиториев Debian
-fix_debian12_repo() {
-    for file in /etc/apt/sources.list /etc/apt/sources.list.d/*.list; do
-        [ -f "$file" ] || continue
-        if grep -qE "deb\s+$DEBIAN_MIRROR\s+stable\b" "$file"; then
-            sed -i.bak -E "s|(deb\s+$DEBIAN_MIRROR\s+)stable\b|\1bookworm|g" "$file"
-        fi
-        if grep -qE "deb\s+http://security\.debian\.org/debian-security\s+stable-security\b" "$file"; then
-            sed -i.bak -E "s|(deb\s+http://security\.debian\.org/debian-security\s+)stable-security\b|\1bookworm-security|g" "$file"
-        fi
-    done
-}
-
-mkdir -p "${LOG_FOLDER}"
-touch "${LOG_FILE}"
-exec 2>>"${LOG_FILE}"
-
-echo_ts() { echo "$(date +"%Y-%m-%d %T") - $*"; }
-log() { echo_ts "$*" >> "$LOG_FILE"; }
-message() { echo_ts "$*" | tee -a "$LOG_FILE"; }
-setCurrentStep () { currentStep="$1"; message "${currentStep}"; }
-
-terminate() {
-    if [ $? -ne 0 ]; then
-        echo_ts "Последние 10 строк лога:"
-        tail -n 10 "$LOG_FILE"
-    fi
-    rm -f "$pidfile"
-    message "Скрипт завершён."
-}
 
 # Расширенный обработчик ошибок с подсказками
 errorHandler() {
