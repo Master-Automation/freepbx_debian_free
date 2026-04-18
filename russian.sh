@@ -197,15 +197,26 @@ install_asterisk() {
 # Настройка репозиториев
 setup_repositories() {
     message "Настройка репозиториев..."
+
+    # Репозиторий FreePBX (российское зеркало)
     if ! grep -qsF "deb [arch=amd64] http://git.freepbx.asterisk.ru/freepbx17-prod bookworm main" /etc/apt/sources.list; then
         echo "deb [arch=amd64] http://git.freepbx.asterisk.ru/freepbx17-prod bookworm main" | tee -a /etc/apt/sources.list >> "$log"
     fi
     wget -O - http://git.freepbx.asterisk.ru/gpg/aptly-pubkey.asc | gpg --dearmor --yes -o /etc/apt/trusted.gpg.d/freepbx.gpg >> "$log"
-    if ! grep -qsF "deb $DEBIAN_MIRROR bookworm main" /etc/apt/sources.list; then
-        echo "deb $DEBIAN_MIRROR bookworm main non-free non-free-firmware" | tee -a /etc/apt/sources.list >> "$log"
-    fi
-    fix_debian12_repo
-    block_debian13_trixie_update
+
+    # Полные репозитории Debian от Яндекса (HTTPS)
+    cat >> /etc/apt/sources.list <<EOF
+deb https://mirror.yandex.ru/debian/ bookworm main contrib non-free non-free-firmware
+deb-src https://mirror.yandex.ru/debian/ bookworm main contrib non-free non-free-firmware
+
+deb https://mirror.yandex.ru/debian-security/ bookworm-security main contrib non-free non-free-firmware
+deb-src https://mirror.yandex.ru/debian-security/ bookworm-security main contrib non-free non-free-firmware
+
+deb https://mirror.yandex.ru/debian/ bookworm-updates main contrib non-free non-free-firmware
+deb-src https://mirror.yandex.ru/debian/ bookworm-updates main contrib non-free non-free-firmware
+EOF
+
+    # Обновляем список пакетов
     apt-get update >> "$log"
 }
 
