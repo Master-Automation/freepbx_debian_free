@@ -158,32 +158,38 @@ install_asterisk() {
         rm -rf asterisk-${astver}
     fi
 
-    # Автоматические повторные попытки клонирования
-    MAX_RETRIES=3
-    RETRY_DELAY=10
-    for i in $(seq 1 $MAX_RETRIES); do
-        message "Попытка $i из $MAX_RETRIES: клонирование репозитория Asterisk ${astver}..."
-        if git clone -b ${astver} https://github.com/asterisk/asterisk.git asterisk-${astver} 2>&1; then
-            message "Клонирование успешно завершено."
-            break
-        else
-            message "⚠️ Клонирование не удалось (попытка $i)."
-            if [ $i -lt $MAX_RETRIES ]; then
-                message "Повтор через $RETRY_DELAY секунд..."
-                sleep $RETRY_DELAY
-            else
-                message "❌ ОШИБКА: Не удалось клонировать репозиторий после $MAX_RETRIES попыток."
-                message "Возможные причины: проблемы с интернетом, блокировка GitHub, недостаточно места на диске."
-                message "Что делать:"
-                message "1. Проверьте соединение: ping -c 4 github.com"
-                message "2. Попробуйте позже или вручную выполните: git clone -b 22 https://github.com/asterisk/asterisk.git /usr/src/asterisk-22"
-                message "3. Затем перезапустите скрипт."
-                exit 1
-            fi
-        fi
-    done
+# Устанавливаем буфер для Git (один раз, вне цикла)
+git config --global http.postBuffer 524288000
 
-    cd asterisk-${astver}
+# Автоматические повторные попытки клонирования
+MAX_RETRIES=3
+RETRY_DELAY=10
+for i in $(seq 1 $MAX_RETRIES); do
+    message "Попытка $i из $MAX_RETRIES: клонирование репозитория Asterisk ${astver}..."
+    if git clone --depth 1 -b ${astver} https://github.com/asterisk/asterisk.git asterisk-${astver} 2>&1; then
+        message "Клонирование успешно завершено."
+        break
+    else
+        message "⚠️ Клонирование не удалось (попытка $i)."
+        # Удаляем частично скачанную папку, если есть
+        rm -rf asterisk-${astver} 2>/dev/null || true
+        if [ $i -lt $MAX_RETRIES ]; then
+            message "Повтор через $RETRY_DELAY секунд..."
+            sleep $RETRY_DELAY
+        else
+            message "❌ ОШИБКА: Не удалось клонировать репозиторий после $MAX_RETRIES попыток."
+            message "Возможные причины: проблемы с интернетом, блокировка GitHub, недостаточно места на диске."
+            message "Что делать:"
+            message "1. Проверьте соединение: ping -c 4 github.com"
+            message "2. Попробуйте позже или вручную выполните: git clone --depth 1 -b 22 https://github.com/asterisk/asterisk.git /usr/src/asterisk-22"
+            message "3. Затем перезапустите скрипт."
+            exit 1
+        fi
+    fi
+done
+
+cd asterisk-${astver}
+
     message "Установка зависимостей для сборки..."
     if ! ./contrib/scripts/install_prereq install; then
         message "❌ ОШИБКА: Не удалось установить зависимые пакеты для сборки Asterisk."
