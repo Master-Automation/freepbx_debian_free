@@ -59,7 +59,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Расширенный обработчик ошибок с подсказками
+# Расширенный обработчик ошибок с подсказками на русском
 errorHandler() {
     local line=$1
     local code=$2
@@ -72,70 +72,60 @@ errorHandler() {
     case "${currentStep}" in
         "=== НАСТРОЙКА РЕПОЗИТОРИЕВ ===")
             echo_ts "Возможная причина: проблемы с сетью или недоступность зеркал."
-            echo_ts "Проверьте интернет-соединение: ping -c 4 git.freepbx.asterisk.ru"
-            echo_ts "Если зеркало недоступно, замените REPO_URL в скрипте на другое."
+            echo_ts "Что делать:"
+            echo_ts "1. Проверьте интернет-соединение: ping -c 4 git.freepbx.asterisk.ru"
+            echo_ts "2. Если зеркало недоступно, замените REPO_URL в скрипте на другое."
+            echo_ts "3. Повторите попытку через 5-10 минут."
             ;;
         "=== УСТАНОВКА ЗАВИСИМОСТЕЙ ===")
             echo_ts "Возможная причина: отсутствуют некоторые пакеты или конфликт версий."
-            echo_ts "Попробуйте выполнить вручную: apt-get update && apt-get install -f"
-            echo_ts "Затем перезапустите скрипт."
+            echo_ts "Что делать:"
+            echo_ts "1. Попробуйте выполнить вручную: apt-get update && apt-get install -f"
+            echo_ts "2. Затем перезапустите скрипт: sudo ./russian.sh --skipversion --opensourceonly"
             ;;
         "=== УСТАНОВКА ASTERISK ===")
             echo_ts "Возможная причина: не хватает места на диске или отсутствуют компиляторы."
-            echo_ts "Проверьте свободное место: df -h /usr/src"
-            echo_ts "Установите build-essential: apt-get install -y build-essential"
+            echo_ts "Что делать:"
+            echo_ts "1. Проверьте свободное место: df -h /usr/src"
+            echo_ts "2. Установите компиляторы: apt-get install -y build-essential"
+            echo_ts "3. Если ошибка повторяется, попробуйте собрать Asterisk вручную (см. лог)."
             ;;
         "=== УСТАНОВКА FREEPBX ===")
             echo_ts "Возможная причина: сбой при загрузке пакетов из репозитория."
-            echo_ts "Проверьте репозиторий: apt-cache policy freepbx17"
-            echo_ts "Если ключ GPG устарел, выполните: wget -O - http://git.freepbx.asterisk.ru/gpg/aptly-pubkey.asc | apt-key add -"
+            echo_ts "Что делать:"
+            echo_ts "1. Проверьте репозиторий: apt-cache policy freepbx17"
+            echo_ts "2. Если ключ GPG устарел, выполните: wget -O - http://git.freepbx.asterisk.ru/gpg/aptly-pubkey.asc | apt-key add -"
             ;;
         "=== ПЕРЕЗАГРУЗКА FREEPBX ===")
             echo_ts "Возможная причина: Asterisk не запущен или сокет недоступен."
-            echo_ts "Проверьте статус: systemctl status asterisk"
-            echo_ts "Запустите вручную: systemctl start asterisk && fwconsole start"
+            echo_ts "Что делать:"
+            echo_ts "1. Проверьте статус: systemctl status asterisk"
+            echo_ts "2. Запустите вручную: systemctl start asterisk && fwconsole start"
             ;;
         "=== НАСТРОЙКА APACHE ===")
             echo_ts "Возможная причина: ошибка в конфигурации или порт 80 занят."
-            echo_ts "Проверьте синтаксис: apachectl configtest"
-            echo_ts "Посмотрите логи: tail -20 /var/log/apache2/error.log"
+            echo_ts "Что делать:"
+            echo_ts "1. Проверьте синтаксис: apachectl configtest"
+            echo_ts "2. Посмотрите логи: tail -20 /var/log/apache2/error.log"
             ;;
         *)
             echo_ts "Общие рекомендации:"
             echo_ts "1. Проверьте наличие свободного места на диске: df -h"
             echo_ts "2. Проверьте интернет-соединение: ping -c 4 ya.ru"
             echo_ts "3. Посмотрите полный лог: cat ${LOG_FILE}"
+            echo_ts "4. Если ничего не помогло, обратитесь за помощью с логом."
             ;;
     esac
     exit "$code"
 }
+
+# Перехват ошибок: при любой ошибке вызываем errorHandler, а при завершении скрипта — terminate
 trap 'errorHandler "$LINENO" "$?" "$BASH_COMMAND"' ERR
 trap "terminate" EXIT
 
-isinstalled() {
-    PKG_OK=$(dpkg-query -W --showformat='${Status}\n' "$@" 2>/dev/null|grep "install ok installed")
-    [ -n "$PKG_OK" ]
-}
-
-pkg_install() {
-    log "############################### "
-    PKG=("$@")
-    if isinstalled "${PKG[@]}"; then
-        log "${PKG[*]} уже установлен."
-    else
-        message "Установка ${PKG[*]} ...."
-        apt-get -y --ignore-missing -o DPkg::Options::="--force-confnew" -o Dpkg::Options::="--force-overwrite" install "${PKG[@]}" >> "$log"
-        if isinstalled "${PKG[@]}"; then
-            message "${PKG[*]} установлен успешно."
-        else
-            message "Не удалось установить ${PKG[*]}. Прерывание."
-            terminate
-        fi
-    fi
-    log "############################### "
-}
 
 # Установка Asterisk из исходников (с исправлением библиотеки)
+
 install_asterisk() {
     astver=$1
     message "Сборка Asterisk ${astver} из исходников. Это займёт 20-40 минут."
@@ -153,11 +143,17 @@ install_asterisk() {
     ./configure --libdir=/usr/lib64 --with-pjproject-bundled
     make menuselect.makeopts
     menuselect/menuselect --enable chan_pjsip --enable res_srtp --enable res_http_websocket --enable codec_opus --enable codec_g729a --enable format_mp3
+    
+    # Загрузка библиотеки для поддержки MP3
+    message "Загрузка библиотеки для поддержки MP3..."
+    contrib/scripts/get_mp3_source.sh
+    
     message "Компиляция Asterisk (самый долгий этап)..."
     make -j$(nproc)
     make install
     make config
     ldconfig
+    
     if [ -f /usr/src/asterisk-${astver}/main/libasteriskssl.so.1 ]; then
         cp /usr/src/asterisk-${astver}/main/libasteriskssl.so.1 /usr/lib64/
         echo "/usr/lib64" > /etc/ld.so.conf.d/asterisk.conf
@@ -165,6 +161,17 @@ install_asterisk() {
         message "Библиотека libasteriskssl.so.1 скопирована и зарегистрирована."
     else
         message "ВНИМАНИЕ: libasteriskssl.so.1 не найдена. Возможны проблемы с запуском Asterisk."
+    fi
+
+    # Проверяем статус поддержки MP3 и даём пояснение
+    if [ -f /usr/src/asterisk-${astver}/main/format_mp3.so ]; then
+        message "Примечание: Поддержка MP3 файлов для музыки ожидания БЫЛА включена."
+        message "Это хорошо, если вы планируете использовать MP3. Если нет — ничего страшного."
+    else
+        message "Примечание: Поддержка MP3 файлов для музыки ожидания НЕ была включена."
+        message "Это не ошибка. MP3 нужен только если вы планируете загружать музыку в формате MP3."
+        message "Если MP3 не нужен, ничего делать не требуется."
+        message "Если нужен: после установки перейдите в веб-интерфейс FreePBX → Music on Hold и загрузите файлы в формате WAV."
     fi
     message "Asterisk ${astver} успешно собран и установлен."
 }
