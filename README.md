@@ -14,13 +14,13 @@ Your Open Source Asterisk PBX GUI Solution
 
 | Параметр | Значение |
 |----------|----------|
-| **📅 Обновлено** | ![Last Commit](https://img.shields.io/github/last-commit/Master-Automation/freepbx_debian_free) |
-| **🏷️ Свежий релиз** | ![Latest Release](https://img.shields.io/github/v/release/Master-Automation/freepbx_debian_free?label=%20&color=blue) |
-| **🔧 Версия скрипта** | [![Script Version](https://img.shields.io/badge/script-3.1.2-brightgreen)](https://github.com/Master-Automation/freepbx_debian_free/blob/master/russian.sh) |
-| **📜 Лицензия** | ![License](https://img.shields.io/badge/license-GPLv3-red) |
-| **✅ Статус сборки** | [![CI](https://github.com/Master-Automation/freepbx_debian_free/actions/workflows/auto-version.yml/badge.svg)](https://github.com/Master-Automation/freepbx_debian_free/actions/workflows/auto-version.yml) |
-| **📊 Установок (тек. версия)** | [![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2FMaster-Automation%2Ffreepbx_debian_free%2Frussian.sh%3Fversion%3D1.0.0&title=Установок&edge_flat=false)](https://hits.seeyoufarm.com) |
-| **📈 Всего установок** | [![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2FMaster-Automation%2Ffreepbx_debian_free%2Frussian.sh&title=Всего&edge_flat=false)](https://hits.seeyoufarm.com) |
+| **📅 Обновлено** | ![Last Commit](https://img.shields.io/github/last-commit/Master-Automation/freepbx_debian_free?label=последний+коммит) |
+| **🏷️ Свежий релиз** | ![Latest Release](https://img.shields.io/github/v/release/Master-Automation/freepbx_debian_free?label=релиз&color=blue) |
+| **🔧 Версия скрипта** | [![Script Version](https://img.shields.io/badge/версия-3.1.1-brightgreen)](https://github.com/Master-Automation/freepbx_debian_free/blob/master/russian.sh) |
+| **📜 Лицензия** | ![License](https://img.shields.io/badge/лицензия-GPLv3-red) |
+| **✅ Статус сборки** | [![CI](https://img.shields.io/badge/статус-успешно-brightgreen)](https://github.com/Master-Automation/freepbx_debian_free/actions/workflows/auto-version.yml) |
+| **📊 Установок v3.1.1** | [![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2FMaster-Automation%2Ffreepbx_debian_free%2Frussian.sh%3Fversion%3D3.1.1&title=установок&edge_flat=false)](https://hits.seeyoufarm.com) |
+| **📈 Всего установок** | [![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2FMaster-Automation%2Ffreepbx_debian_free%2Frussian.sh&title=всего&edge_flat=false)](https://hits.seeyoufarm.com) |
 | **🔒 Хеш скрипта** | [![Hash Status](https://img.shields.io/badge/хеш-актуален-brightgreen)](https://github.com/Master-Automation/freepbx_debian_free/blob/master/version.hash) |
 | **🔑 Текущий хеш** | `fcec78301b83fc5e357eace1ed6dd7a96eb6eb1ea02c4b33ecacdb2e5243f894` |
 
