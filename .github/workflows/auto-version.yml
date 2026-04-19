@@ -22,13 +22,11 @@ jobs:
       - name: Get current version
         id: version
         run: |
-          VERSION=$(grep 'SCRIPT_VERSION="' russian.sh | cut -d'"' -f2 | tr -d ' \n\r')
+          VERSION=$(grep 'SCRIPT_VERSION="' russian.sh | cut -d'"' -f2 | xargs)
           if [ -z "$VERSION" ]; then
             VERSION="1.0.0"
           fi
-          echo "current<<EOF" >> $GITHUB_OUTPUT
-          echo "$VERSION" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          echo "current=${VERSION}" >> $GITHUB_OUTPUT
 
       - name: Increment patch version
         id: new
@@ -37,9 +35,7 @@ jobs:
           IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
           PATCH=$((PATCH + 1))
           NEW="$MAJOR.$MINOR.$PATCH"
-          echo "version<<EOF" >> $GITHUB_OUTPUT
-          echo "$NEW" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          echo "version=${NEW}" >> $GITHUB_OUTPUT
 
       - name: Update script
         run: |
