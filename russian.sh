@@ -225,6 +225,15 @@ safe_fwconsole_reload() {
     fi
 }
 
+# Создание необходимых каталогов
+mkdir -p "${LOG_FOLDER}"
+touch "${LOG_FILE}"
+chmod 755 "${LOG_FOLDER}"
+
+# Создание каталога для PID-файла
+mkdir -p /var/run
+chmod 755 /var/run
+
 # ===========================
 # Основной процесс установки
 # ===========================
