@@ -676,8 +676,15 @@ mkdir -p /var/lib/php/session
 
 setCurrentStep "=== УСТАНОВКА FREEPBX ==="
 message "Будет скачано ~100-200 МБ (пакеты FreePBX)."
-pkg_install ioncube-loader-82
-install_freepbx   # ← Новая функция с fallback
+
+# ionCube требуется только для коммерческих модулей
+if [ "$opensourceonly" = true ]; then
+    message "ℹ️ Режим --opensourceonly: установка ionCube пропущена (не требуется)"
+else
+    pkg_install ioncube-loader-82
+fi
+
+install_freepbx
 
 # Удаление коммерческих модулей (оставляем только нужные)
 if [ "$opensourceonly" ]; then
