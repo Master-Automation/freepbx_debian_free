@@ -41,6 +41,7 @@ jobs:
           sed -i "s/SCRIPT_VERSION=\"[0-9.]*\"/SCRIPT_VERSION=\"$NEW\"/" russian.sh
           sed -i "s/script-[0-9.]*-brightgreen/script-$NEW-brightgreen/" README.md
           sed -i "s/Установок v[0-9.]*/Установок v$NEW/" README.md
+          sed -i "s/| Версия скрипта | [0-9.]* /| Версия скрипта | $NEW /" README.md
           sha256sum russian.sh | awk '{print $1}' > version.hash
 
       - name: Commit
