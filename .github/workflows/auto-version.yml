@@ -8,19 +8,23 @@ on:
     branches:
       - master
       - main
+  workflow_dispatch:
 
 jobs:
   update-version:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
       
       - name: Get current version
         id: version
         run: |
-          VERSION=$(grep -oP 'SCRIPT_VERSION="\K[0-9.]+' russian.sh || echo "1.0.0")
+          VERSION=$(grep 'SCRIPT_VERSION="' russian.sh | cut -d'"' -f2 || echo "1.0.0")
           echo "current=$VERSION" >> $GITHUB_OUTPUT
       
       - name: Increment patch version
@@ -47,6 +51,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git pull --rebase
           git add russian.sh README.md
-          git commit -m "🔖 Bump version to ${{ steps.new.outputs.version }} [skip ci]"
+          git diff --cached --quiet || git commit -m "🔖 Bump version to ${{ steps.new.outputs.version }} [skip ci]"
           git push
