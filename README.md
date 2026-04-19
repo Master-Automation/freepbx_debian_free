@@ -15,7 +15,7 @@ Your Open Source Asterisk PBX GUI Solution
 | Параметр | Значение |
 |----------|----------|
 | **📅 Обновлено** | ![Last Commit](https://img.shields.io/github/last-commit/Master-Automation/freepbx_debian_free) |
-| **🏷️ Версия релиза** | ![Version](https://img.shields.io/badge/release-1.0.0-blue) |
+| **🏷️ Свежий релиз** | ![Latest Release](https://img.shields.io/github/v/release/Master-Automation/freepbx_debian_free?label=%20&color=blue) |
 | **🔧 Версия скрипта** | [![Script Version](https://img.shields.io/badge/script-3.1-brightgreen)](https://github.com/Master-Automation/freepbx_debian_free/blob/master/russian.sh) |
 | **📜 Лицензия** | ![License](https://img.shields.io/badge/license-GPLv3-red) |
 | **✅ Статус сборки** | [![CI](https://github.com/Master-Automation/freepbx_debian_free/actions/workflows/auto-version.yml/badge.svg)](https://github.com/Master-Automation/freepbx_debian_free/actions/workflows/auto-version.yml) |
