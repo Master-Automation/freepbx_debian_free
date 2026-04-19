@@ -1,0 +1,46 @@
+# .github/workflows/auto-version.yml
+name: Auto-version
+
+on:
+  push:
+    paths:
+      - 'russian.sh'
+    branches:
+      - master
+      - main
+
+jobs:
+  update-version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Get current version
+        id: version
+        run: |
+          VERSION=$(grep -oP 'SCRIPT_VERSION="\K[0-9.]+' russian.sh || echo "1.0.0")
+          echo "current=$VERSION" >> $GITHUB_OUTPUT
+      
+      - name: Increment patch version
+        id: new
+        run: |
+          CURRENT="${{ steps.version.outputs.current }}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          PATCH=$((PATCH + 1))
+          NEW="$MAJOR.$MINOR.$PATCH"
+          echo "version=$NEW" >> $GITHUB_OUTPUT
+      
+      - name: Update script
+        run: |
+          sed -i "s/SCRIPT_VERSION=\"[0-9.]*\"/SCRIPT_VERSION=\"${{ steps.new.outputs.version }}\"/" russian.sh
+          sed -i "s/SCRIPT_DATE=\"[0-9-]*\"/SCRIPT_DATE=\"$(date +%Y-%m-%d)\"/" russian.sh
+      
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add russian.sh
+          git commit -m "🔖 Bump version to ${{ steps.new.outputs.version }} [skip ci]"
+          git push
