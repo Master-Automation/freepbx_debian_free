@@ -128,6 +128,7 @@ trap "terminate" EXIT
 
 install_asterisk() {
     astver=$1
+    message "Будет скачано ~50 МБ (исходный код Asterisk с GitHub)."
     message "Сборка Asterisk ${astver} из исходников. Это займёт 20-40 минут."
     mkdir -p /usr/src
     cd /usr/src
@@ -328,6 +329,14 @@ setCurrentStep "=== НАСТРОЙКА РЕПОЗИТОРИЕВ ==="
 setup_repositories
 
 setCurrentStep "=== УСТАНОВКА ЗАВИСИМОСТЕЙ (5-10 минут) ==="
+
+message "============================================"
+message "ПРИМЕЧАНИЕ О ТРАФИКЕ"
+message "В процессе установки будет скачано около 500-800 МБ данных."
+message "Итоговый размер системы на диске: 2-4 ГБ."
+message "============================================"
+message "Начинаем установку зависимостей..."
+
 DEPPRODPKGS=(
     "redis-server" "ghostscript" "libtiff-tools" "iptables-persistent" "net-tools"
     "rsyslog" "libavahi-client3" "nmap" "apache2" "zip" "incron" "wget" "vim"
@@ -386,6 +395,7 @@ phpenmod freepbx
 mkdir -p /var/lib/php/session
 
 setCurrentStep "=== УСТАНОВКА FREEPBX ==="
+message "Будет скачано ~100-200 МБ (пакеты FreePBX)."
 pkg_install ioncube-loader-82
 pkg_install freepbx17
 
