@@ -14,7 +14,7 @@ Your Open Source Asterisk PBX GUI Solution
 
 ## 🚀 Особенности
 
-- Использует **российские зеркала** Debian (`mirror.yandex.ru`) и FreePBX (`git.freepbx.asterisk.ru`).
+- Использует **Российские зеркала** Debian (`mirror.yandex.ru`) и FreePBX (`git.freepbx.asterisk.ru`).
 - Собирает **Asterisk 22** из исходников (обход проблем с `deb.freepbx.org`).
 - Автоматически копирует `libasteriskssl.so.1` и настраивает `ld.so.conf.d` (избавляет от ошибки `cannot open shared object file`).
 - Включает модули Apache (`expires`, `headers`, `rewrite`), отключает стандартный сайт, активирует `freepbx.conf`.
@@ -39,3 +39,11 @@ Your Open Source Asterisk PBX GUI Solution
 1. **Скачайте скрипт** (например, в домашнюю папку):
    ```bash
    wget https://raw.githubusercontent.com/Master-Automation/sng_freepbx_debian_install/master/russian.sh
+   
+2. **Сделайте файл исполняемым:
+   ```bash
+   chmod +x russian.sh
+   
+3. ** Запустите скрипт с правами root и рекомендуемыми параметрами:
+  ```bash
+   sudo ./russian.sh --skipversion --opensourceonly
