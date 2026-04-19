@@ -73,6 +73,8 @@ Your Open Source Asterisk PBX GUI Solution
 bash <(curl -sL https://raw.githubusercontent.com/Master-Automation/freepbx_debian_free/master/install.sh)
 ```
 
+## После успешной установки
+
 ## 🔐 Первый вход
 Откройте браузер и перейдите на http://<IP-адрес-сервера>.
 
