@@ -151,54 +151,120 @@ pkg_install() {
 install_asterisk() {
     astver=$1
     message "Сборка Asterisk ${astver} из исходников. Это займёт 20-40 минут."
-    mkdir -p /usr/src
-    cd /usr/src
-    if [ -d "asterisk-${astver}" ]; then
-        message "Удаляем старый каталог исходников..."
-        rm -rf asterisk-${astver}
-    fi
-
-# Устанавливаем буфер для Git (один раз, вне цикла)
-git config --global http.postBuffer 524288000
-
-# Автоматические повторные попытки клонирования
-MAX_RETRIES=3
-RETRY_DELAY=10
-for i in $(seq 1 $MAX_RETRIES); do
-    message "Попытка $i из $MAX_RETRIES: клонирование репозитория Asterisk ${astver}..."
-    if git clone --depth 1 -b ${astver} https://github.com/asterisk/asterisk.git asterisk-${astver} 2>&1; then
-        message "Клонирование успешно завершено."
-        break
-    else
-        message "⚠️ Клонирование не удалось (попытка $i)."
-        # Удаляем частично скачанную папку, если есть
-        rm -rf asterisk-${astver} 2>/dev/null || true
-        if [ $i -lt $MAX_RETRIES ]; then
-            message "Повтор через $RETRY_DELAY секунд..."
-            sleep $RETRY_DELAY
-        else
-            message "❌ ОШИБКА: Не удалось клонировать репозиторий после $MAX_RETRIES попыток."
-            message "Возможные причины: проблемы с интернетом, блокировка GitHub, недостаточно места на диске."
-            message "Что делать:"
-            message "1. Проверьте соединение: ping -c 4 github.com"
-            message "2. Попробуйте позже или вручную выполните: git clone --depth 1 -b 22 https://github.com/asterisk/asterisk.git /usr/src/asterisk-22"
-            message "3. Затем перезапустите скрипт."
-            exit 1
+    
+    # Проверяем, не установлен ли уже Asterisk
+    if command -v asterisk > /dev/null 2>&1; then
+        INSTALLED_VERSION=$(asterisk -rx "core show version" 2>/dev/null | grep -oP 'Asterisk \K[0-9.]+' || echo "")
+        if [[ "$INSTALLED_VERSION" == "$astver"* ]]; then
+            message "✅ Asterisk ${astver} уже установлен. Пропускаем сборку."
+            return 0
         fi
     fi
-done
+    
+    mkdir -p /usr/src
+    cd /usr/src
+    
+    # Удаляем старую/частичную папку, если есть
+    if [ -d "asterisk-${astver}" ]; then
+        message "⚠️ Обнаружена старая/частичная папка исходников. Удаляем..."
+        rm -rf asterisk-${astver}
+    fi
+    
+    # Увеличиваем буфер для Git
+    git config --global http.postBuffer 524288000
+    
+    # Автоматические повторные попытки клонирования
+    MAX_RETRIES=3
+    RETRY_DELAY=10
+    for i in $(seq 1 $MAX_RETRIES); do
+        message "Попытка $i из $MAX_RETRIES: клонирование репозитория Asterisk ${astver}..."
+        if git clone --depth 1 -b ${astver} https://github.com/asterisk/asterisk.git asterisk-${astver} 2>&1; then
+            message "✅ Клонирование успешно завершено."
+            break
+        else
+            message "⚠️ Клонирование не удалось (попытка $i)."
+            rm -rf asterisk-${astver} 2>/dev/null || true
+            if [ $i -lt $MAX_RETRIES ]; then
+                message "Повтор через $RETRY_DELAY секунд..."
+                sleep $RETRY_DELAY
+            else
+                message "❌ ОШИБКА: Не удалось клонировать репозиторий после $MAX_RETRIES попыток."
+                message "Возможные причины: проблемы с интернетом, блокировка GitHub, недостаточно места на диске."
+                message "Что делать:"
+                message "1. Проверьте соединение: ping -c 4 github.com"
+                message "2. Попробуйте позже или вручную выполните: git clone --depth 1 -b 22 https://github.com/asterisk/asterisk.git /usr/src/asterisk-22"
+                message "3. Затем перезапустите скрипт."
+                exit 1
+            fi
+        fi
+    done
 
-cd asterisk-${astver}
-
+    cd asterisk-${astver}
+    
+    # Установка зависимостей для сборки (с fallback)
     message "Установка зависимостей для сборки..."
-    if ! ./contrib/scripts/install_prereq install; then
-        message "❌ ОШИБКА: Не удалось установить зависимые пакеты для сборки Asterisk."
-        message "Что делать: попробуйте выполнить вручную: sudo apt-get install -y build-essential libedit-dev uuid-dev libjansson-dev libxml2-dev libsqlite3-dev"
-        exit 1
+    if ! ./contrib/scripts/install_prereq install 2>&1; then
+        message "⚠️ Автоматическая установка зависимостей не удалась, пробуем вручную..."
+        apt-get update -y
+        apt-get install -y \
+            build-essential \
+            cmake \
+            libxml2-dev \
+            libsqlite3-dev \
+            libjansson-dev \
+            libssl-dev \
+            libedit-dev \
+            uuid-dev \
+            libxslt1-dev \
+            liburiparser-dev \
+            libspandsp-dev \
+            libspeexdsp-dev \
+            libopus-dev \
+            libsrtp2-dev \
+            portaudio19-dev \
+            liblua5.2-dev \
+            libcurl4-openssl-dev \
+            libpq-dev \
+            unixodbc-dev \
+            libneon27-dev \
+            libgmime-3.0-dev \
+            libgsm1-dev \
+            libvorbis-dev \
+            libogg-dev \
+            libcodec2-dev \
+            libfreetype6-dev \
+            libfontconfig1-dev \
+            libicu-dev \
+            libsndfile1-dev \
+            libopencore-amrnb-dev \
+            libopenjp2-7-dev \
+            libmp3lame-dev \
+            libc-client2007e-dev \
+            libldap2-dev \
+            libtool \
+            autoconf \
+            pkg-config
+        
+        if [ $? -ne 0 ]; then
+            message "❌ ОШИБКА: Не удалось установить зависимости для сборки Asterisk."
+            message "Что делать: попробуйте выполнить вручную:"
+            message "sudo apt-get update"
+            message "sudo apt-get install -y build-essential libedit-dev uuid-dev libjansson-dev libxml2-dev libsqlite3-dev"
+            message "Затем перезапустите скрипт."
+            exit 1
+        fi
+        message "✅ Зависимости успешно установлены вручную."
+    else
+        message "✅ Зависимости успешно установлены автоматически."
     fi
 
     message "Конфигурация Asterisk..."
     ./configure --libdir=/usr/lib64 --with-pjproject-bundled
+    if [ $? -ne 0 ]; then
+        message "❌ ОШИБКА: Не удалось настроить конфигурацию Asterisk."
+        exit 1
+    fi
+    
     make menuselect.makeopts
     menuselect/menuselect --enable chan_pjsip --enable res_srtp --enable res_http_websocket --enable codec_opus --enable codec_g729a --enable format_mp3
 
@@ -207,7 +273,19 @@ cd asterisk-${astver}
 
     message "Компиляция Asterisk (самый долгий этап)..."
     make -j$(nproc)
+    if [ $? -ne 0 ]; then
+        message "❌ ОШИБКА: Не удалось скомпилировать Asterisk."
+        message "Что делать: попробуйте выполнить вручную:"
+        message "cd /usr/src/asterisk-${astver} && make -j$(nproc)"
+        exit 1
+    fi
+    
     make install
+    if [ $? -ne 0 ]; then
+        message "❌ ОШИБКА: Не удалось установить Asterisk."
+        exit 1
+    fi
+    
     make config
     ldconfig
 
@@ -219,16 +297,8 @@ cd asterisk-${astver}
     else
         message "ВНИМАНИЕ: libasteriskssl.so.1 не найдена. Возможны проблемы с запуском Asterisk."
     fi
-
-    # Проверяем статус поддержки MP3
-    if [ -f /usr/src/asterisk-${astver}/main/format_mp3.so ]; then
-        message "Примечание: Поддержка MP3 файлов для музыки ожидания БЫЛА включена."
-    else
-        message "Примечание: Поддержка MP3 файлов для музыки ожидания НЕ была включена."
-        message "Это не ошибка. MP3 нужен только если вы планируете загружать музыку в формате MP3."
-        message "Если нужен: после установки перейдите в веб-интерфейс FreePBX → Music on Hold и загрузите файлы в формате WAV."
-    fi
-    message "Asterisk ${astver} успешно собран и установлен."
+    
+    message "✅ Asterisk ${astver} успешно собран и установлен."
 }
 
 # Настройка репозиториев (без дублирования)
