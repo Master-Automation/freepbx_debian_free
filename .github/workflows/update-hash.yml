@@ -7,6 +7,7 @@ on:
     branches:
       - master
       - main
+  workflow_dispatch:
 
 jobs:
   update:
@@ -15,7 +16,8 @@ jobs:
       contents: write
     
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
       
@@ -24,28 +26,22 @@ jobs:
         run: |
           HASH=$(sha256sum russian.sh | awk '{print $1}')
           echo "hash=$HASH" >> $GITHUB_OUTPUT
-          echo "✅ Новый хеш: $HASH"
+          echo "✅ Хеш: $HASH"
       
       - name: Update version.hash file
         run: |
           echo "${{ steps.hash.outputs.hash }}" > version.hash
           echo "✅ version.hash обновлён"
       
-      - name: Update hash in README table
-        run: |
-          # Обновляем хеш в таблице README
-          sed -i "s/`[a-f0-9]\{64\}`/`${{ steps.hash.outputs.hash }}`/" README.md
-          echo "✅ Хеш в README обновлён"
-      
-      - name: Update hash status badge
-        run: |
-          # Опционально: обновляем бейдж статуса (он всегда зелёный, так как хеш актуален)
-          sed -i "s|хеш-[а-я]*-|хеш-актуален-|" README.md
-      
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add version.hash README.md
-          git diff --cached --quiet || git commit -m "🤖 Автообновление хеша: ${{ steps.hash.outputs.hash }} [skip ci]"
-          git push
+          git add version.hash
+          if git diff --cached --quiet; then
+            echo "ℹ️ Нет изменений для коммита"
+          else
+            git commit -m "🤖 Обновление version.hash [skip ci]"
+            git push
+            echo "✅ Изменения запушены"
+          fi
