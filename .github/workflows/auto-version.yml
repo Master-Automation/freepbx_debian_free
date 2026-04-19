@@ -7,7 +7,6 @@ on:
       - 'russian.sh'
     branches:
       - master
-      - main
   workflow_dispatch:
 
 jobs:
@@ -16,51 +15,39 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Get current version
-        id: version
+      - name: Get version
+        id: ver
         run: |
-          VERSION=$(grep 'SCRIPT_VERSION="' russian.sh | cut -d'"' -f2 | tr -d ' \t\n\r')
-          if [ -z "$VERSION" ]; then
-            VERSION="1.0.0"
-          fi
-          echo "current=${VERSION}" >> $GITHUB_OUTPUT
+          VER=$(grep 'SCRIPT_VERSION="' russian.sh | head -1 | cut -d'"' -f2)
+          echo "current=$VER" >> $GITHUB_OUTPUT
 
-      - name: Increment patch version
-        id: new
+      - name: Bump version
+        id: bump
         run: |
-          CURRENT="${{ steps.version.outputs.current }}"
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
-          PATCH=$((PATCH + 1))
-          NEW="$MAJOR.$MINOR.$PATCH"
-          echo "version=${NEW}" >> $GITHUB_OUTPUT
+          OLD="${{ steps.ver.outputs.current }}"
+          MAJOR=$(echo $OLD | cut -d. -f1)
+          MINOR=$(echo $OLD | cut -d. -f2)
+          PATCH=$(echo $OLD | cut -d. -f3)
+          NEW="$MAJOR.$MINOR.$((PATCH+1))"
+          echo "new=$NEW" >> $GITHUB_OUTPUT
 
-      - name: Update script
+      - name: Update files
         run: |
-          NEW_VER="${{ steps.new.outputs.version }}"
-          sed -i "s/SCRIPT_VERSION=\"[0-9.]*\"/SCRIPT_VERSION=\"${NEW_VER}\"/" russian.sh
-          sed -i "s/SCRIPT_DATE=\"[0-9-]*\"/SCRIPT_DATE=\"$(date +%Y-%m-%d)\"/" russian.sh
-
-      - name: Update README badges
-        run: |
-          NEW_VER="${{ steps.new.outputs.version }}"
-          sed -i "s/script-[0-9.]*-brightgreen/script-${NEW_VER}-brightgreen/" README.md
-          sed -i "s/Установок v[0-9.]*/Установок v${NEW_VER}/" README.md
-          sed -i "s/version=[0-9.]*/version=${NEW_VER}/" README.md
-          sed -i "s/версия [0-9.]*/версия ${NEW_VER}/" README.md
-
-      - name: Update version.hash
-        run: |
+          NEW="${{ steps.bump.outputs.new }}"
+          sed -i "s/SCRIPT_VERSION=\"[0-9.]*\"/SCRIPT_VERSION=\"$NEW\"/" russian.sh
+          sed -i "s/script-[0-9.]*-brightgreen/script-$NEW-brightgreen/" README.md
+          sed -i "s/Установок v[0-9.]*/Установок v$NEW/" README.md
           sha256sum russian.sh | awk '{print $1}' > version.hash
 
-      - name: Commit and push
+      - name: Commit
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           git add russian.sh README.md version.hash
-          git diff --cached --quiet && echo "No changes" && exit 0
-          git commit -m "🔖 Bump version to ${{ steps.new.outputs.version }} [skip ci]"
-          git pull --rebase --autostash origin master
-          git push origin master
+          git commit -m "Bump version to ${{ steps.bump.outputs.new }} [skip ci]" || exit 0
+          git pull --rebase
+          git push
