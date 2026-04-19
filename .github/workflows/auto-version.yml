@@ -37,9 +37,10 @@ jobs:
           NEW="$MAJOR.$MINOR.$PATCH"
           echo "version=${NEW}" >> $GITHUB_OUTPUT
 
-      - name: Update script
+           - name: Update script
         run: |
-          sed -i "s/SCRIPT_VERSION=\"[0-9.]*\"/SCRIPT_VERSION=\"${{ steps.new.outputs.version }}\"/" russian.sh
+          NEW_VER="${{ steps.new.outputs.version }}"
+          sed -i "s/SCRIPT_VERSION=\"[0-9.]*\"/SCRIPT_VERSION=\"${NEW_VER}\"/" russian.sh
           sed -i "s/SCRIPT_DATE=\"[0-9-]*\"/SCRIPT_DATE=\"$(date +%Y-%m-%d)\"/" russian.sh
 
       - name: Update script version badge in README
