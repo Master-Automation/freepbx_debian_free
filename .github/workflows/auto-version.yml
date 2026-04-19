@@ -43,24 +43,24 @@ jobs:
           sed -i "s/SCRIPT_VERSION=\"[0-9.]*\"/SCRIPT_VERSION=\"${NEW_VER}\"/" russian.sh
           sed -i "s/SCRIPT_DATE=\"[0-9-]*\"/SCRIPT_DATE=\"$(date +%Y-%m-%d)\"/" russian.sh
 
-      - name: Update script version badge in README
+      - name: Update README badges
         run: |
-          NEW_VERSION="${{ steps.new.outputs.version }}"
-          sed -i "s/script-[0-9.]*-brightgreen/script-${NEW_VERSION}-brightgreen/" README.md
-          sed -i "s/Установок v[0-9.]*/Установок v${NEW_VERSION}/" README.md
-          sed -i "s/version=[0-9.]*/version=${NEW_VERSION}/" README.md
-          sed -i "s/версия [0-9.]*/версия ${NEW_VERSION}/" README.md
+          NEW_VER="${{ steps.new.outputs.version }}"
+          sed -i "s/script-[0-9.]*-brightgreen/script-${NEW_VER}-brightgreen/" README.md
+          sed -i "s/Установок v[0-9.]*/Установок v${NEW_VER}/" README.md
+          sed -i "s/version=[0-9.]*/version=${NEW_VER}/" README.md
+          sed -i "s/версия [0-9.]*/версия ${NEW_VER}/" README.md
 
       - name: Update version.hash
         run: |
           sha256sum russian.sh | awk '{print $1}' > version.hash
 
-      - name: Commit
+      - name: Commit and push
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git pull --rebase --autostash
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add russian.sh README.md version.hash
-          git diff --cached --quiet && echo "No changes to commit" && exit 0
+          git diff --cached --quiet && echo "No changes" && exit 0
           git commit -m "🔖 Bump version to ${{ steps.new.outputs.version }} [skip ci]"
-          git push
+          git pull --rebase --autostash origin master
+          git push origin master
