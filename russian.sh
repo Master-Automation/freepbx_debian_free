@@ -2,7 +2,7 @@
 #####################################################################################
 # Скрипт установки FreePBX 17 на Debian 12
 # Адаптирован под условия в России
-# Версия: 3.1 (Полностью рабочая)
+# Версия: 3.1.2
 #####################################################################################
 set -e
 SCRIPT_VERSION="3.1.2"
@@ -50,6 +50,53 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 export PATH=$SANE_PATH
+
+# Проверка ранее выполненных этапов
+check_previous_install() {
+    message "🔍 Проверка ранее установленных компонентов..."
+    
+    # Флаг для отслеживания необходимости переустановки
+    NEED_ASTERISK=0
+    NEED_FREEPBX=0
+    
+    # Проверка Asterisk
+    if command -v asterisk > /dev/null 2>&1; then
+        ASTERISK_VERSION=$(asterisk -rx "core show version" 2>/dev/null | head -1)
+        if [ -n "$ASTERISK_VERSION" ]; then
+            message "   ✅ Asterisk уже установлен: $ASTERISK_VERSION"
+            NEED_ASTERISK=1
+        else
+            message "   ⚠️ Asterisk установлен, но не отвечает"
+        fi
+    else
+        message "   ⬜ Asterisk не установлен"
+    fi
+    
+    # Проверка FreePBX
+    if command -v fwconsole > /dev/null 2>&1; then
+        message "   ✅ FreePBX уже установлен"
+        NEED_FREEPBX=1
+    else
+        message "   ⬜ FreePBX не установлен"
+    fi
+    
+    # Пропускаем установку Asterisk если уже есть
+    if [ $NEED_ASTERISK -eq 1 ]; then
+        export SKIP_ASTERISK=1
+        message "   ℹ️ Сборка Asterisk будет пропущена"
+    fi
+    
+    # Пропускаем установку FreePBX если уже есть
+    if [ $NEED_FREEPBX -eq 1 ]; then
+        export SKIP_FREEPBX=1
+        message "   ℹ️ Установка FreePBX будет пропущена"
+    fi
+    
+    message ""
+}
+
+# Вызываем проверку
+check_previous_install
 
 # Парсинг параметров
 while [[ $# -gt 0 ]]; do
@@ -150,10 +197,9 @@ pkg_install() {
 # Установка Asterisk из исходников (с исправлением библиотеки)
 install_asterisk() {
     astver=$1
-CACHE_DIR="/var/cache/asterisk-built"
-
+    CACHE_DIR="/var/cache/asterisk-built"
     
-       # Определяем примерный объём и время в зависимости от глубины клонирования
+    # Определяем примерный объём и время в зависимости от глубины клонирования
     if git clone --depth 1 --dry-run https://github.com/asterisk/asterisk.git 2>&1 | grep -q "done"; then
         ESTIMATED_SIZE="~9-15 МБ"
         ESTIMATED_TIME="5-10 минут"
@@ -213,9 +259,9 @@ CACHE_DIR="/var/cache/asterisk-built"
         fi
     done
 
-       cd asterisk-${astver}
+    cd asterisk-${astver}
 
-      # Установка зависимостей для сборки (с fallback и диагностикой)
+    # Установка зависимостей для сборки (с fallback и диагностикой)
     message "Установка зависимостей для сборки..."
     
     # Пытаемся выполнить автоматическую установку
@@ -315,6 +361,7 @@ CACHE_DIR="/var/cache/asterisk-built"
             exit 1
         fi
     fi
+    
     message "Конфигурация Asterisk..."
     ./configure --libdir=/usr/lib64 --with-pjproject-bundled
     if [ $? -ne 0 ]; then
@@ -322,7 +369,7 @@ CACHE_DIR="/var/cache/asterisk-built"
         exit 1
     fi
     
-     make menuselect.makeopts
+    make menuselect.makeopts
     # Отключаем кодеки, требующие скачивания с digium.com (сервер недоступен из РФ)
     menuselect/menuselect --enable chan_pjsip --enable res_srtp --enable res_http_websocket --enable format_mp3
     menuselect/menuselect --disable codec_opus --disable codec_g729a
@@ -589,10 +636,10 @@ mark_step() {
     message "   ✅ $step_num. $step_name — выполнено"
 }
 
-
 setCurrentStep "=== ПРОВЕРКА И ПОДГОТОВКА СИСТЕМЫ ==="
 apt-get -y --fix-broken install >> "$log"
 apt-get autoremove -y >> "$log"
+mark_step 1 "Проверка и подготовка системы"
 
 setCurrentStep "=== НАСТРОЙКА ПАРАМЕТРОВ ПО УМОЛЧАНИЮ ==="
 debconf-set-selections <<EOF
@@ -606,6 +653,7 @@ pkg_install gnupg
 
 setCurrentStep "=== НАСТРОЙКА РЕПОЗИТОРИЕВ ==="
 setup_repositories
+mark_step 2 "Настройка репозиториев"
 
 setCurrentStep "=== УСТАНОВКА ЗАВИСИМОСТЕЙ (5-10 минут) ==="
 message "============================================"
@@ -648,7 +696,8 @@ fi
 setCurrentStep "=== ОЧИСТКА ==="
 apt-get autoremove -y >> "$log"
 execution_time="$(($(date +%s) - start))"
-message "Время установки зависимостей: $execution_time с"
+message "Время установки зависимостей: $execution_time сек."
+mark_step 3 "Установка зависимостей"
 
 setCurrentStep "=== НАСТРОЙКА КАТАЛОГОВ И ПРАВ ==="
 groupadd -r asterisk 2>/dev/null || true
@@ -659,12 +708,14 @@ sed -i -e "s|^TFTP_DIRECTORY=\"/srv\/tftp\"$|TFTP_DIRECTORY=\"/tftpboot\"|" /etc
 systemctl unmask tftpd-hpa.service
 systemctl start tftpd-hpa.service
 
-# Установка Asterisk
-if [ -z "$noast" ]; then
-   setCurrentStep "=== УСТАНОВКА ASTERISK ==="
-   
-# сообщение об объёме и времени будет внутри функции install_asterisk
+# Установка Asterisk (пропускаем если уже есть)
+if [ -z "$noast" ] && [ "$SKIP_ASTERISK" != "1" ]; then
+    setCurrentStep "=== УСТАНОВКА ASTERISK ==="
     install_asterisk $ASTVERSION
+    mark_step 4 "Сборка Asterisk 22"
+elif [ "$SKIP_ASTERISK" = "1" ]; then
+    message "⏭️ Пропуск установки Asterisk (уже установлен)"
+    mark_step 4 "Сборка Asterisk 22 (пропущено)"
 fi
 
 setCurrentStep "=== УСТАНОВКА ПАКЕТОВ FREEPBX ==="
@@ -674,17 +725,24 @@ setCurrentStep "=== НАСТРОЙКА PHP И МОДУЛЕЙ ==="
 phpenmod freepbx
 mkdir -p /var/lib/php/session
 
-setCurrentStep "=== УСТАНОВКА FREEPBX ==="
-message "Будет скачано ~100-200 МБ (пакеты FreePBX)."
-
-# ionCube требуется только для коммерческих модулей
-if [ "$opensourceonly" = true ]; then
-    message "ℹ️ Режим --opensourceonly: установка ionCube пропущена (не требуется)"
+# Установка FreePBX (пропускаем если уже есть)
+if [ "$SKIP_FREEPBX" != "1" ]; then
+    setCurrentStep "=== УСТАНОВКА FREEPBX ==="
+    message "Будет скачано ~100-200 МБ (пакеты FreePBX)."
+    
+    # ionCube требуется только для коммерческих модулей
+    if [ "$opensourceonly" = true ]; then
+        message "ℹ️ Режим --opensourceonly: установка ionCube пропущена (не требуется)"
+    else
+        pkg_install ioncube-loader-82
+    fi
+    
+    install_freepbx
+    mark_step 5 "Установка FreePBX"
 else
-    pkg_install ioncube-loader-82
+    message "⏭️ Пропуск установки FreePBX (уже установлен)"
+    mark_step 5 "Установка FreePBX (пропущено)"
 fi
-
-install_freepbx
 
 # Удаление коммерческих модулей (оставляем только нужные)
 if [ "$opensourceonly" ]; then
@@ -729,6 +787,7 @@ if [ $? -ne 0 ]; then
     message "Посмотрите логи: journalctl -u apache2 -n 20"
     exit 1
 fi
+mark_step 6 "Настройка Apache и автозапуска"
 
 # Настройка автозапуска
 setCurrentStep "=== НАСТРОЙКА АВТОЗАПУСКА ==="
@@ -821,6 +880,7 @@ message "Веб-интерфейс FreePBX доступен по адресу: h
 message "Логин: admin, пароль задаётся при первом входе."
 message "============================================"
 fwconsole motd
+mark_step 7 "Финальная настройка"
 
 # Функция отправки статистики
 send_stats() {
