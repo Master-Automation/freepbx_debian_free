@@ -68,7 +68,7 @@ wget --no-check-certificate https://raw.githubusercontent.com/Master-Automation/
 ```
 sha256sum russian.sh
 ```
-Сравните с текущим: EXPECTED="248bace4de3f816c6685ccdccd55dd8afadb2a7812934141c8e2cc878406c292"
+Сравните с текущим: EXPECTED="248bace4de3f816c6685ccdccd55dd8afadb2a7812934141c8e2cc878406c292"  
 **📅 Последнее обновление скрипта:** `<!-- LAST_UPDATE -->`
 
 3. Сделайте скрипт исполняемым:
