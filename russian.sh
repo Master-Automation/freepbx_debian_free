@@ -271,7 +271,8 @@ install_asterisk() {
     message "Загрузка библиотеки для поддержки MP3..."
     contrib/scripts/get_mp3_source.sh
 
-    message "Компиляция Asterisk (самый долгий этап)..."
+      
+      message "Компиляция Asterisk (самый долгий этап)..."
     make -j$(nproc)
     if [ $? -ne 0 ]; then
         message "❌ ОШИБКА: Не удалось скомпилировать Asterisk."
@@ -280,10 +281,28 @@ install_asterisk() {
         exit 1
     fi
     
+    # Отключаем автоматическое скачивание кодеков (сервер digium.com часто недоступен)
+    export CODEC_OPUS_DOWNLOAD_DISABLE=1
+    export CODEC_G729_DOWNLOAD_DISABLE=1
+    export CODEC_SILK_DOWNLOAD_DISABLE=1
+    
+    message "ℹ️ Кодеки Opus/G.729 пропущены (стандартные кодеки ulaw/alaw/gsm уже установлены)"
+    message "   При необходимости кодеки можно установить позже: sudo apt install asterisk-opus"
+    
+    message "Установка Asterisk..."
     make install
     if [ $? -ne 0 ]; then
         message "❌ ОШИБКА: Не удалось установить Asterisk."
         exit 1
+    fi
+    
+    # Установка бесплатного open-source кодека Opus из репозитория Debian
+    message "Установка open-source кодека Opus из репозитория Debian..."
+    apt-get install -y asterisk-opus libopus-dev 2>&1 | tee -a "$log"
+    if [ $? -eq 0 ]; then
+        message "   ✅ Opus установлен (бесплатная open-source версия)"
+    else
+        message "   ⚠️ Не удалось установить Opus, продолжаем без него"
     fi
     
     make config
@@ -300,6 +319,7 @@ install_asterisk() {
     
     message "✅ Asterisk ${astver} успешно собран и установлен."
 }
+
 
 # Настройка репозиториев (без дублирования)
 setup_repositories() {
