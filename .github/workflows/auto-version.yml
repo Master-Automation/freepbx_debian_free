@@ -45,15 +45,8 @@ jobs:
       - name: Update script version badge in README
         run: |
           NEW_VERSION="${{ steps.new.outputs.version }}"
-          # Обновляем бейдж script-X.X-brightgreen
-          sed -i "s/script-[0-9.]*-brightgreen/script-${NEW_VERSION}-brightgreen/" README.md
-          # Обновляем текст "Установок vX.X.X"
-          sed -i "s/Установок v[0-9.]*/Установок v${NEW_VERSION}/" README.md
-          # Обновляем параметр version= в URL счётчика
-          sed -i "s/version=[0-9.]*/version=${NEW_VERSION}/" README.md
-          # Обновляем простой текст версии в таблице (который вы видите)
-          sed -i "s/| \*\*Версия скрипта\*\* | [0-9.]* /| **Версия скрипта** | ${NEW_VERSION} /" README.md
-          sed -i "s/| Версия скрипта | [0-9.]* /| Версия скрипта | ${NEW_VERSION} /" README.md
+          # Заменяем маркер SCRIPT_VERSION_PLACEHOLDER на актуальную версию
+          sed -i "s/SCRIPT_VERSION_PLACEHOLDER/${NEW_VERSION}/g" README.md
           echo "✅ Бейдж версии скрипта обновлён: ${NEW_VERSION}"
 
       - name: Update version.hash
