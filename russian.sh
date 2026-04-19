@@ -150,7 +150,19 @@ pkg_install() {
 # Установка Asterisk из исходников (с исправлением библиотеки)
 install_asterisk() {
     astver=$1
-    message "Сборка Asterisk ${astver} из исходников. Это займёт 20-40 минут."
+    
+       # Определяем примерный объём и время в зависимости от глубины клонирования
+    if git clone --depth 1 --dry-run https://github.com/asterisk/asterisk.git 2>&1 | grep -q "done"; then
+        ESTIMATED_SIZE="~9-15 МБ"
+        ESTIMATED_TIME="5-10 минут"
+    else
+        ESTIMATED_SIZE="~50-80 МБ"
+        ESTIMATED_TIME="20-40 минут"
+    fi
+    
+    message "Сборка Asterisk ${astver} из исходников."
+    message "   📦 Объём скачивания: ${ESTIMATED_SIZE}"
+    message "   ⏱️ Примерное время: ${ESTIMATED_TIME}"
     
     # Проверяем, не установлен ли уже Asterisk
     if command -v asterisk > /dev/null 2>&1; then
