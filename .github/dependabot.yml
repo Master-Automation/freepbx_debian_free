@@ -1,0 +1,32 @@
+version: 2
+updates:
+  # Автоматическое обновление GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "10:00"
+      timezone: "Europe/Moscow"
+    commit-message:
+      prefix: "⬆️"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "automerge"
+    open-pull-requests-limit: 5
+    
+  # Автоматическое обновление самого скрипта (если используете внешние зависимости)
+  - package-ecosystem: "pip"  # если используете Python
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      
+  # Проверка безопасности
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    target-branch: "master"
+    commit-message:
+      prefix: "🔒"
