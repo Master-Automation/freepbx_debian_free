@@ -22,13 +22,8 @@ jobs:
       - name: Get current version
         id: version
         run: |
-          # Ищем строку SCRIPT_VERSION="X.X" и извлекаем номер версии
-          VERSION=$(grep -E 'SCRIPT_VERSION="[0-9.]+"' russian.sh | sed -E 's/.*"([0-9.]+)".*/\1/')
-          if [ -z "$VERSION" ]; then
-            VERSION="1.0.0"
-          fi
+          VERSION=$(grep 'SCRIPT_VERSION="' russian.sh | cut -d'"' -f2 || echo "1.0.0")
           echo "current=$VERSION" >> $GITHUB_OUTPUT
-          echo "Текущая версия: $VERSION"
 
       - name: Increment patch version
         id: new
@@ -38,25 +33,30 @@ jobs:
           PATCH=$((PATCH + 1))
           NEW="$MAJOR.$MINOR.$PATCH"
           echo "version=$NEW" >> $GITHUB_OUTPUT
-          echo "Новая версия: $NEW"
 
       - name: Update script
         run: |
           sed -i "s/SCRIPT_VERSION=\"[0-9.]*\"/SCRIPT_VERSION=\"${{ steps.new.outputs.version }}\"/" russian.sh
           sed -i "s/SCRIPT_DATE=\"[0-9-]*\"/SCRIPT_DATE=\"$(date +%Y-%m-%d)\"/" russian.sh
-          echo "✅ Скрипт обновлён до версии ${{ steps.new.outputs.version }}"
 
       - name: Update script version badge in README
         run: |
           NEW_VERSION="${{ steps.new.outputs.version }}"
           sed -i "s/script-[0-9.]*-brightgreen/script-${NEW_VERSION}-brightgreen/" README.md
-          echo "✅ Бейдж версии скрипта обновлён: ${NEW_VERSION}"
+          sed -i "s/Установок v[0-9.]*/Установок v${NEW_VERSION}/" README.md
+          sed -i "s/version=[0-9.]*/version=${NEW_VERSION}/" README.md
 
-      - name: Commit and push changes
+      - name: Update version.hash
+        run: |
+          # Вычисляем хеш обновлённого russian.sh и сохраняем в version.hash
+          sha256sum russian.sh | awk '{print $1}' > version.hash
+          echo "✅ version.hash обновлён"
+
+      - name: Commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add russian.sh README.md
-          git diff --staged --quiet || git commit -m "🔖 Bump version to ${{ steps.new.outputs.version }} [skip ci]"
-          git pull --rebase origin ${{ github.ref_name }}
+          git pull --rebase
+          git add russian.sh README.md version.hash
+          git diff --cached --quiet || git commit -m "🔖 Bump version to ${{ steps.new.outputs.version }} [skip ci]"
           git push
