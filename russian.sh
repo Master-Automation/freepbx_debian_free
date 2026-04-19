@@ -502,6 +502,14 @@ message "   ⬜ 6. Настройка Apache и автозапуска"
 message "   ⬜ 7. Финальная настройка (русский язык, звуки)"
 message ""
 
+# Функция отметки прогресса
+mark_step() {
+    local step_num=$1
+    local step_name=$2
+    message "   ✅ $step_num. $step_name — выполнено"
+}
+
+
 setCurrentStep "=== ПРОВЕРКА И ПОДГОТОВКА СИСТЕМЫ ==="
 apt-get -y --fix-broken install >> "$log"
 apt-get autoremove -y >> "$log"
