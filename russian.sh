@@ -13,6 +13,21 @@ log=$LOG_FILE
 SANE_PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 NPM_MIRROR=""
 
+# Функции логирования
+echo_ts() { echo "$(date +"%Y-%m-%d %T") - $*"; }
+log() { echo_ts "$*" >> "$LOG_FILE"; }
+message() { echo_ts "$*" | tee -a "$LOG_FILE"; }
+setCurrentStep () { currentStep="$1"; message "${currentStep}"; }
+
+terminate() {
+    if [ $? -ne 0 ]; then
+        echo_ts "Последние 10 строк лога:"
+        tail -n 10 "$LOG_FILE"
+    fi
+    rm -f "$pidfile"
+    message "Скрипт завершён."
+}
+
 # Проверка ОС
 if [ -f /etc/os-release ]; then
     DEBIAN_OS_VERSION=$(grep -oP '(?<=VERSION_CODENAME=).*' /etc/os-release)
@@ -32,22 +47,6 @@ fi
 
 export PATH=$SANE_PATH
 
-# Функции логирования
-echo_ts() { echo "$(date +"%Y-%m-%d %T") - $*"; }
-log() { echo_ts "$*" >> "$LOG_FILE"; }
-message() { echo_ts "$*" | tee -a "$LOG_FILE"; }
-setCurrentStep () { currentStep="$1"; message "${currentStep}"; }
-
-terminate() {
-    if [ $? -ne 0 ]; then
-        echo_ts "Последние 10 строк лога:"
-        tail -n 10 "$LOG_FILE"
-    fi
-    rm -f "$pidfile"
-    message "Скрипт завершён."
-}
-
-
 # Парсинг параметров
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -58,7 +57,6 @@ while [[ $# -gt 0 ]]; do
         *) shift ;;
     esac
 done
-
 
 # Расширенный обработчик ошибок с подсказками
 errorHandler() {
@@ -180,8 +178,8 @@ setup_repositories() {
     fi
     wget -O - http://git.freepbx.asterisk.ru/gpg/aptly-pubkey.asc | gpg --dearmor --yes -o /etc/apt/trusted.gpg.d/freepbx.gpg >> "$log"
 
-   # Полные репозитории Debian от Яндекса (HTTPS)
-cat >> /etc/apt/sources.list <<EOF
+    # Полные репозитории Debian от Яндекса (HTTPS)
+    cat >> /etc/apt/sources.list <<EOF
 deb https://mirror.yandex.ru/debian/ bookworm main contrib non-free non-free-firmware
 deb-src https://mirror.yandex.ru/debian/ bookworm main contrib non-free non-free-firmware
 
@@ -191,7 +189,6 @@ deb-src https://mirror.yandex.ru/debian-security/ bookworm-security main contrib
 deb https://mirror.yandex.ru/debian/ bookworm-updates main contrib non-free non-free-firmware
 deb-src https://mirror.yandex.ru/debian/ bookworm-updates main contrib non-free non-free-firmware
 EOF
-    # Обновляем список пакетов
     apt-get update >> "$log"
 }
 
@@ -227,7 +224,6 @@ safe_fwconsole_reload() {
         return 1
     fi
 }
-
 
 # ===========================
 # Основной процесс установки
@@ -336,9 +332,7 @@ pkg_install freepbx17
 # Удаление коммерческих модулей (оставляем только нужные)
 if [ "$opensourceonly" ]; then
     setCurrentStep "Удаление ненужных коммерческих модулей"
-    # Список модулей, которые НЕ удаляем (оставляем)
     keep_modules="sysadmin|firewall|customcontexts"
-    # Получаем список коммерческих модулей, исключая те, что в keep_modules
     modules_to_remove=$(fwconsole ma list | awk '/Commercial/ {print $2}' | grep -vE "$keep_modules" || true)
     if [ -n "$modules_to_remove" ]; then
         echo "$modules_to_remove" | xargs -t -I {} fwconsole ma -f remove {} >> "$log" 2>&1
@@ -357,7 +351,7 @@ setCurrentStep "Настройка веб-сервера Apache"
 cat > /etc/apache2/sites-available/freepbx.conf <<'EOF'
 <VirtualHost *:80>
     DocumentRoot /var/www/html
-    ServerName 192.168.20.1
+    ServerName localhost
     <Directory /var/www/html>
         Options FollowSymLinks
         AllowOverride All
@@ -367,7 +361,6 @@ cat > /etc/apache2/sites-available/freepbx.conf <<'EOF'
     CustomLog ${APACHE_LOG_DIR}/freepbx-access.log combined
 </VirtualHost>
 EOF
-
 a2enmod ssl expires headers rewrite
 a2dissite 000-default.conf 2>/dev/null || true
 a2ensite freepbx.conf
@@ -400,7 +393,6 @@ ExecStop=/usr/sbin/fwconsole stop
 [Install]
 WantedBy=multi-user.target
 EOF
-
 
 systemctl daemon-reload
 systemctl stop freepbx 2>/dev/null || true
