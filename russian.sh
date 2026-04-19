@@ -2,10 +2,10 @@
 #####################################################################################
 # Скрипт установки FreePBX 17 на Debian 12
 # адаптированый под условия в России
-# Версия: 3.0 (с расширенной обработкой ошибок и подсказками)
+# Версия: 3.1 (улучшенная структура вывода и исправление дублирования репозиториев)
 #####################################################################################
 set -e
-SCRIPTVER="3.0"
+SCRIPTVER="3.1"
 ASTVERSION=${ASTVERSION:-22}
 PHPVERSION="8.2"
 LOG_FOLDER="/var/log/pbx"
@@ -70,32 +70,32 @@ errorHandler() {
     echo_ts "Подробности в логе: ${LOG_FILE}"
     
     case "${currentStep}" in
-        "Настройка репозиториев")
+        "=== НАСТРОЙКА РЕПОЗИТОРИЕВ ===")
             echo_ts "Возможная причина: проблемы с сетью или недоступность зеркал."
             echo_ts "Проверьте интернет-соединение: ping -c 4 git.freepbx.asterisk.ru"
             echo_ts "Если зеркало недоступно, замените REPO_URL в скрипте на другое."
             ;;
-        "Установка зависимостей")
+        "=== УСТАНОВКА ЗАВИСИМОСТЕЙ ===")
             echo_ts "Возможная причина: отсутствуют некоторые пакеты или конфликт версий."
             echo_ts "Попробуйте выполнить вручную: apt-get update && apt-get install -f"
             echo_ts "Затем перезапустите скрипт."
             ;;
-        "Установка Asterisk")
+        "=== УСТАНОВКА ASTERISK ===")
             echo_ts "Возможная причина: не хватает места на диске или отсутствуют компиляторы."
             echo_ts "Проверьте свободное место: df -h /usr/src"
             echo_ts "Установите build-essential: apt-get install -y build-essential"
             ;;
-        "Установка FreePBX")
+        "=== УСТАНОВКА FREEPBX ===")
             echo_ts "Возможная причина: сбой при загрузке пакетов из репозитория."
             echo_ts "Проверьте репозиторий: apt-cache policy freepbx17"
             echo_ts "Если ключ GPG устарел, выполните: wget -O - http://git.freepbx.asterisk.ru/gpg/aptly-pubkey.asc | apt-key add -"
             ;;
-        "Перезагрузка FreePBX")
+        "=== ПЕРЕЗАГРУЗКА FREEPBX ===")
             echo_ts "Возможная причина: Asterisk не запущен или сокет недоступен."
             echo_ts "Проверьте статус: systemctl status asterisk"
             echo_ts "Запустите вручную: systemctl start asterisk && fwconsole start"
             ;;
-        "Настройка веб-сервера Apache")
+        "=== НАСТРОЙКА APACHE ===")
             echo_ts "Возможная причина: ошибка в конфигурации или порт 80 занят."
             echo_ts "Проверьте синтаксис: apachectl configtest"
             echo_ts "Посмотрите логи: tail -20 /var/log/apache2/error.log"
@@ -138,7 +138,7 @@ pkg_install() {
 # Установка Asterisk из исходников (с исправлением библиотеки)
 install_asterisk() {
     astver=$1
-    message "=== Сборка Asterisk ${astver} из исходников (обычно для Debian 12). Это займёт 20-40 минут. ==="
+    message "Сборка Asterisk ${astver} из исходников. Это займёт 20-40 минут."
     mkdir -p /usr/src
     cd /usr/src
     if [ -d "asterisk-${astver}" ]; then
@@ -169,16 +169,16 @@ install_asterisk() {
     message "Asterisk ${astver} успешно собран и установлен."
 }
 
-# Настройка репозиториев
+# Настройка репозиториев (без дублирования)
 setup_repositories() {
-    message "Добавление репозитория FreePBX = http://git.freepbx.asterisk.ru/freepbx17-prod bookworm main"
+    message "Добавление репозитория FreePBX (зеркало git.freepbx.asterisk.ru)..."
     if ! grep -qsF "deb [arch=amd64] http://git.freepbx.asterisk.ru/freepbx17-prod bookworm main" /etc/apt/sources.list; then
         echo "deb [arch=amd64] http://git.freepbx.asterisk.ru/freepbx17-prod bookworm main" | tee -a /etc/apt/sources.list >> "$log"
     fi
     wget -O - http://git.freepbx.asterisk.ru/gpg/aptly-pubkey.asc | gpg --dearmor --yes -o /etc/apt/trusted.gpg.d/freepbx.gpg >> "$log"
 
-    message "Замена репозиториев Debian на зеркало Яндекса..."
-    # Удаляем старые строки deb и deb-src (оставляем только FreePBX)
+    message "Замена репозиториев Debian на зеркало Яндекса (mirror.yandex.ru)..."
+    # Удаляем старые строки deb и deb-src (кроме строки FreePBX)
     sed -i '/^deb /d' /etc/apt/sources.list
     sed -i '/^deb-src /d' /etc/apt/sources.list
 
@@ -195,6 +195,7 @@ EOF
     apt-get update >> "$log"
     message "Репозитории настроены."
 }
+
 # Генерация русской локали в системе
 setup_russian_locale() {
     message "Настройка русской локали в системе..."
@@ -254,16 +255,16 @@ if [ -f "$pidfile" ]; then
 fi
 echo "$$" > "$pidfile"
 
-setCurrentStep "Начало установки FreePBX 17"
+setCurrentStep "=== НАЧАЛО УСТАНОВКИ FREEPBX 17 ==="
 start=$(date +%s)
 message "Система: $(hostname) $(uname -a)"
 message "Лог установки: $log"
 
-setCurrentStep "Проверка и подготовка системы"
+setCurrentStep "=== ПРОВЕРКА И ПОДГОТОВКА СИСТЕМЫ ==="
 apt-get -y --fix-broken install >> "$log"
 apt-get autoremove -y >> "$log"
 
-setCurrentStep "Настройка параметров по умолчанию"
+setCurrentStep "=== НАСТРОЙКА ПАРАМЕТРОВ ПО УМОЛЧАНИЮ ==="
 debconf-set-selections <<EOF
 iptables-persistent iptables-persistent/autosave_v4 boolean true
 iptables-persistent iptables-persistent/autosave_v6 boolean true
@@ -273,13 +274,10 @@ echo "postfix postfix/main_mailer_type string 'Internet Site'" | debconf-set-sel
 
 pkg_install gnupg
 
-setCurrentStep "Настройка репозиториев"
+setCurrentStep "=== НАСТРОЙКА РЕПОЗИТОРИЕВ ==="
 setup_repositories
 
-setCurrentStep "Обновление списка пакетов"
-apt-get update >> "$log"
-
-setCurrentStep "Установка зависимостей (это может занять несколько минут)"
+setCurrentStep "=== УСТАНОВКА ЗАВИСИМОСТЕЙ (5-10 минут) ==="
 DEPPRODPKGS=(
     "redis-server" "ghostscript" "libtiff-tools" "iptables-persistent" "net-tools"
     "rsyslog" "libavahi-client3" "nmap" "apache2" "zip" "incron" "wget" "vim"
@@ -310,12 +308,12 @@ if [ "$nochrony" != true ]; then
     pkg_install chrony
 fi
 
-setCurrentStep "Очистка"
+setCurrentStep "=== ОЧИСТКА ==="
 apt-get autoremove -y >> "$log"
 execution_time="$(($(date +%s) - start))"
 message "Время установки зависимостей: $execution_time с"
 
-setCurrentStep "Настройка каталогов и прав"
+setCurrentStep "=== НАСТРОЙКА КАТАЛОГОВ И ПРАВ ==="
 groupadd -r asterisk 2>/dev/null || true
 useradd -r -g asterisk -d /home/asterisk -M -s /bin/bash asterisk 2>/dev/null || true
 mkdir -p /tftpboot /var/lib/asterisk/sounds
@@ -326,24 +324,24 @@ systemctl start tftpd-hpa.service
 
 # Установка Asterisk
 if [ -z "$noast" ]; then
-    setCurrentStep "Установка Asterisk"
+    setCurrentStep "=== УСТАНОВКА ASTERISK (20-40 минут) ==="
     install_asterisk $ASTVERSION
 fi
 
-setCurrentStep "Установка пакетов FreePBX"
+setCurrentStep "=== УСТАНОВКА ПАКЕТОВ FREEPBX ==="
 pkg_install sysadmin17 sangoma-pbx17 ffmpeg
 
-setCurrentStep "Настройка PHP и модулей"
+setCurrentStep "=== НАСТРОЙКА PHP И МОДУЛЕЙ ==="
 phpenmod freepbx
 mkdir -p /var/lib/php/session
 
-setCurrentStep "Установка FreePBX"
+setCurrentStep "=== УСТАНОВКА FREEPBX ==="
 pkg_install ioncube-loader-82
 pkg_install freepbx17
 
 # Удаление коммерческих модулей (оставляем только нужные)
 if [ "$opensourceonly" ]; then
-    setCurrentStep "Удаление ненужных коммерческих модулей"
+    setCurrentStep "=== УДАЛЕНИЕ КОММЕРЧЕСКИХ МОДУЛЕЙ (оставляем sysadmin, firewall, customcontexts) ==="
     keep_modules="sysadmin|firewall|customcontexts"
     modules_to_remove=$(fwconsole ma list | awk '/Commercial/ {print $2}' | grep -vE "$keep_modules" || true)
     if [ -n "$modules_to_remove" ]; then
@@ -354,11 +352,11 @@ if [ "$opensourceonly" ]; then
     fi
 fi
 
-setCurrentStep "Перезагрузка FreePBX"
+setCurrentStep "=== ПЕРЕЗАГРУЗКА FREEPBX ==="
 safe_fwconsole_reload
 
 # Настройка Apache
-setCurrentStep "Настройка веб-сервера Apache"
+setCurrentStep "=== НАСТРОЙКА APACHE ==="
 # Создаём конфигурационный файл виртуального хоста
 cat > /etc/apache2/sites-available/freepbx.conf <<'EOF'
 <VirtualHost *:80>
@@ -386,6 +384,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Настройка автозапуска
+setCurrentStep "=== НАСТРОЙКА АВТОЗАПУСКА ==="
 systemctl enable asterisk
 systemctl start asterisk
 systemctl enable freepbx
@@ -415,7 +414,7 @@ systemctl enable freepbx
 apt-mark hold sangoma-pbx17 nodejs node-* freepbx17 >> "$log"
 
 # ========== ДОПОЛНИТЕЛЬНЫЕ УЛУЧШЕНИЯ ==========
-setCurrentStep "Обновление подписей модулей и установка русского языка"
+setCurrentStep "=== ФИНАЛЬНАЯ НАСТРОЙКА (русский язык, обновления) ==="
 
 # Обновление подписей (исправляет статус "Unknown/повреждён")
 fwconsole ma refreshsignatures >> "$log" 2>&1 || message "Не удалось обновить подписи (возможно, проблема с сетью)."
