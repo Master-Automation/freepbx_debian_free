@@ -374,6 +374,65 @@ CACHE_DIR="/var/cache/asterisk-built"
     message "✅ Asterisk ${astver} успешно собран и установлен."
 }
 
+# Установка FreePBX (с fallback из исходников)
+install_freepbx() {
+    message "=== УСТАНОВКА FREEPBX ==="
+    
+    # Проверяем наличие Composer (нужен для установки из исходников)
+    if ! command -v composer > /dev/null 2>&1; then
+        message "Установка Composer (менеджер зависимостей PHP)..."
+        php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
+        php composer-setup.php --install-dir=/usr/local/bin --filename=composer
+        php -r "unlink('composer-setup.php');"
+        message "   ✅ Composer установлен"
+    fi
+    
+    # Попытка 1: Установка из репозитория (быстро)
+    message "Попытка 1/2: установка из репозитория Sangoma..."
+    if apt-get install -y freepbx17 sangoma-pbx17 sysadmin17 2>&1 | tee -a "$log"; then
+        message "   ✅ FreePBX успешно установлен из репозитория."
+        return 0
+    else
+        message "   ⚠️ Установка из репозитория не удалась."
+        message "      Причина: возможно, репозиторий недоступен или ключи устарели."
+        message "   🔄 Переключаемся на установку из исходников..."
+    fi
+    
+    # Попытка 2: Установка из исходников GitHub (надёжно)
+    message "Попытка 2/2: установка FreePBX из исходников (GitHub)..."
+    
+    cd /usr/src
+    if [ -d "freepbx" ]; then
+        message "   Удаляем старую папку freepbx..."
+        rm -rf freepbx
+    fi
+    
+    # Клонируем репозиторий FreePBX
+    message "   Клонирование репозитория FreePBX..."
+    if ! git clone --depth 1 https://github.com/FreePBX/freepbx.git freepbx 2>&1 | tee -a "$log"; then
+        message "   ❌ ОШИБКА: Не удалось клонировать репозиторий FreePBX."
+        message "      Проверьте соединение с github.com"
+        exit 1
+    fi
+    
+    cd freepbx
+    
+    # Устанавливаем зависимости через composer
+    message "   Установка зависимостей через Composer..."
+    if ! composer install --no-dev 2>&1 | tee -a "$log"; then
+        message "   ⚠️ composer install --no-dev не удался, пробуем без флага..."
+        composer install 2>&1 | tee -a "$log"
+    fi
+    
+    # Запускаем установку FreePBX
+    message "   Запуск установщика FreePBX..."
+    if ! ./install -n 2>&1 | tee -a "$log"; then
+        message "   ❌ ОШИБКА: Не удалось установить FreePBX из исходников."
+        exit 1
+    fi
+    
+    message "   ✅ FreePBX успешно установлен из исходников."
+}
 
 # Настройка репозиториев (без дублирования)
 setup_repositories() {
@@ -618,7 +677,7 @@ mkdir -p /var/lib/php/session
 setCurrentStep "=== УСТАНОВКА FREEPBX ==="
 message "Будет скачано ~100-200 МБ (пакеты FreePBX)."
 pkg_install ioncube-loader-82
-pkg_install freepbx17
+install_freepbx   # ← Новая функция с fallback
 
 # Удаление коммерческих модулей (оставляем только нужные)
 if [ "$opensourceonly" ]; then
