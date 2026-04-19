@@ -1,0 +1,65 @@
+name: Auto-update README hash
+
+on:
+  push:
+    paths:
+      - 'russian.sh'
+    branches:
+      - master
+      - main
+  workflow_dispatch:
+
+jobs:
+  update-hash-in-readme:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Calculate SHA256 hash of russian.sh
+        id: hash
+        run: |
+          HASH=$(sha256sum russian.sh | awk '{print $1}')
+          echo "hash=$HASH" >> $GITHUB_OUTPUT
+          echo "✅ Новый хеш: $HASH"
+      
+      - name: Get current date and time
+        id: date
+        run: |
+          # Получаем дату и время в московском времени (UTC+3)
+          DATE=$(TZ='Europe/Moscow' date '+%Y-%m-%d %H:%M:%S')
+          DATE_RU=$(TZ='Europe/Moscow' date '+%d.%m.%Y %H:%M:%S')
+          echo "datetime=$DATE" >> $GITHUB_OUTPUT
+          echo "datetime_ru=$DATE_RU" >> $GITHUB_OUTPUT
+          echo "📅 Дата: $DATE_RU"
+      
+      - name: Update hash in README
+        run: |
+          # Обновляем хеш
+          sed -i 's/EXPECTED="[a-f0-9]\{64\}"/EXPECTED="${{ steps.hash.outputs.hash }}"/g' README.md
+          sed -i 's/248bace4de3f816c6685ccdccd55dd8afadb2a7812934141c8e2cc878406c292/${{ steps.hash.outputs.hash }}/g' README.md
+          
+          # Обновляем дату (если есть маркер)
+          sed -i 's/<!-- LAST_UPDATE -->.*<!-- \/LAST_UPDATE -->/<!-- LAST_UPDATE -->${{ steps.date.outputs.datetime_ru }}<!-- \/LAST_UPDATE -->/' README.md
+          sed -i 's/<!-- UPDATE_TIMESTAMP -->/<!-- UPDATE_TIMESTAMP -->\n**Обновлено:** ${{ steps.date.outputs.datetime_ru }}/' README.md
+          
+          echo "✅ Хеш и дата обновлены"
+      
+      - name: Commit and push
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          
+          if git diff --cached --quiet; then
+            echo "ℹ️ Нет изменений"
+          else
+            git commit -m "🤖 Обновление хеша и даты (${{ steps.date.outputs.datetime_ru }}) [skip ci]"
+            git push
+            echo "✅ Обновлено: ${{ steps.date.outputs.datetime_ru }}"
+          fi
