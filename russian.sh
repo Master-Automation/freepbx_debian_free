@@ -13,6 +13,9 @@ LOG_FILE="${LOG_FOLDER}/freepbx17-install-$(date '+%Y.%m.%d-%H.%M.%S').log"
 log=$LOG_FILE
 SANE_PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 NPM_MIRROR=""
+export GIT_HTTP_TIMEOUT=300
+export GIT_CLONE_TIMEOUT=300
+
 
 # Функции логирования
 echo_ts() { echo "$(date +"%Y-%m-%d %T") - $*"; }
@@ -224,11 +227,33 @@ install_asterisk() {
 
 # Настройка репозиториев (без дублирования)
 setup_repositories() {
-    message "Добавление репозитория FreePBX (зеркало git.freepbx.asterisk.ru)..."
-    if ! grep -qsF "deb [arch=amd64] http://git.freepbx.asterisk.ru/freepbx17-prod bookworm main" /etc/apt/sources.list; then
-        echo "deb [arch=amd64] http://git.freepbx.asterisk.ru/freepbx17-prod bookworm main" | tee -a /etc/apt/sources.list >> "$log"
+    message "Добавление репозитория FreePBX..."
+    
+    # Проверяем доступность российского зеркала
+    MIRROR_URL="http://git.freepbx.asterisk.ru"
+    FALLBACK_URL="http://packages.freepbx.org"
+    REPO_URL=""
+    
+    if curl -s --connect-timeout 5 "$MIRROR_URL" > /dev/null 2>&1; then
+        message "   ✅ Российское зеркало доступно: $MIRROR_URL"
+        REPO_URL="$MIRROR_URL"
+    else
+        message "   ⚠️ Российское зеркало недоступно, использую официальный репозиторий"
+        message "   (это не ошибка, установка продолжится)"
+        REPO_URL="$FALLBACK_URL"
     fi
-    wget -O - http://git.freepbx.asterisk.ru/gpg/aptly-pubkey.asc | gpg --dearmor --yes -o /etc/apt/trusted.gpg.d/freepbx.gpg >> "$log"
+    
+    # Добавляем репозиторий
+    if ! grep -qsF "deb [arch=amd64] ${REPO_URL}/freepbx17-prod bookworm main" /etc/apt/sources.list; then
+        echo "deb [arch=amd64] ${REPO_URL}/freepbx17-prod bookworm main" | tee -a /etc/apt/sources.list >> "$log"
+    fi
+    
+    # Скачиваем ключ (с fallback)
+    if ! wget -O - "${REPO_URL}/gpg/aptly-pubkey.asc" 2>/dev/null | gpg --dearmor --yes -o /etc/apt/trusted.gpg.d/freepbx.gpg >> "$log" 2>&1; then
+        message "   ⚠️ Не удалось скачать ключ из ${REPO_URL}, пробую из зеркала..."
+        wget -O - "${MIRROR_URL}/gpg/aptly-pubkey.asc" 2>/dev/null | gpg --dearmor --yes -o /etc/apt/trusted.gpg.d/freepbx.gpg >> "$log" 2>&1 || \
+        wget -O - "${FALLBACK_URL}/gpg/aptly-pubkey.asc" 2>/dev/null | gpg --dearmor --yes -o /etc/apt/trusted.gpg.d/freepbx.gpg >> "$log" 2>&1
+    fi
 
     message "Замена репозиториев Debian на зеркало Яндекса (mirror.yandex.ru)..."
     # Удаляем старые строки deb и deb-src (кроме строки FreePBX)
