@@ -150,6 +150,8 @@ pkg_install() {
 # Установка Asterisk из исходников (с исправлением библиотеки)
 install_asterisk() {
     astver=$1
+CACHE_DIR="/var/cache/asterisk-built"
+
     
        # Определяем примерный объём и время в зависимости от глубины клонирования
     if git clone --depth 1 --dry-run https://github.com/asterisk/asterisk.git 2>&1 | grep -q "done"; then
@@ -557,8 +559,9 @@ systemctl start tftpd-hpa.service
 
 # Установка Asterisk
 if [ -z "$noast" ]; then
-    setCurrentStep "=== УСТАНОВКА ASTERISK (20-40 минут) ==="
-    message "Будет скачано ~50 МБ (исходный код Asterisk с GitHub)."
+   setCurrentStep "=== УСТАНОВКА ASTERISK ==="
+   
+# сообщение об объёме и времени будет внутри функции install_asterisk
     install_asterisk $ASTVERSION
 fi
 
@@ -722,7 +725,7 @@ send_stats() {
     
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         # Получаем версию из скрипта
-        VERSION=$(grep -oP 'SCRIPT_VERSION="\K[0-9.]+' "$0" || echo "unknown")
+        VERSION=$(grep 'SCRIPT_VERSION="' "$0" | cut -d'"' -f2 || echo "unknown")
         
         # Отправляем счётчик для конкретной версии
         curl -s "https://api.countapi.xyz/hit/master-automation/freepbx_install/version_${VERSION}" > /dev/null
