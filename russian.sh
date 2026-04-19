@@ -142,8 +142,26 @@ install_asterisk() {
     message "Конфигурация Asterisk..."
     ./configure --libdir=/usr/lib64 --with-pjproject-bundled
     make menuselect.makeopts
-    menuselect/menuselect --enable chan_pjsip --enable res_srtp --enable res_http_websocket --enable codec_opus --enable codec_g729a --enable format_mp3
     
+    # Включаем все нужные модули, КРОМЕ codec_opus
+    menuselect/menuselect --enable chan_pjsip --enable res_srtp --enable res_http_websocket --enable codec_g729a --enable format_mp3
+
+    # --- БЛОК ДЛЯ УСТАНОВКИ OPENSOURCE CODEC_OPUS ---
+    message "Установка opensource версии codec_opus (альтернативный источник)..."
+    cd /usr/src/asterisk-${astver}
+    
+    # Скачиваем opensource версию модуля
+    wget -O /usr/src/codec_opus.tar.gz https://github.com/wazo-platform/wazo-codec-opus-open-source/archive/refs/heads/master.tar.gz
+    mkdir -p /usr/src/codec_opus && tar -xzf /usr/src/codec_opus.tar.gz -C /usr/src/codec_opus --strip-components=1
+    cd /usr/src/codec_opus
+    # Компилируем модуль
+    ./autogen.sh
+    ./configure --with-asterisk=/usr/src/asterisk-${astver}
+    make
+    sudo make install
+    
+    # Возвращаемся в директорию исходников Asterisk
+    cd /usr/src/asterisk-${astver}
     # Загрузка библиотеки для поддержки MP3
     message "Загрузка библиотеки для поддержки MP3..."
     contrib/scripts/get_mp3_source.sh
