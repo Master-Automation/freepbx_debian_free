@@ -18,7 +18,13 @@ Your Open Source Asterisk PBX GUI Solution
 | **📦 Версия** | ![Version](https://img.shields.io/badge/version-1.0.0-blue) |
 | **📜 Лицензия** | ![License](https://img.shields.io/badge/license-GPLv3-red) |
 | **✅ Статус сборки** | [![CI](https://github.com/Master-Automation/freepbx_debian_free/actions/workflows/auto-version.yml/badge.svg)](https://github.com/Master-Automation/freepbx_debian_free/actions/workflows/auto-version.yml) |
+| **📊 Кол-во установок текущей версии** | ![Current](https://api.countapi.xyz/badge/master-automation/freepbx_install/version_1.0.0) |
+| **📈 Кол-во установок всего** | ![Total](https://api.countapi.xyz/badge/master-automation/freepbx_install/total) |
 
+</div>
+
+> 📈 Данные обновляются автоматически после каждой успешной установки.
+> Отправляется только количество установок, никакие личные данные не собираются.
 Автоматический скрипт для установки **FreePBX 17** на чистую систему **Debian 12 (Bookworm)** с учётом российских зеркал, исправлением типичных ошибок и подробными подсказками при сбоях.
 
 </br>
