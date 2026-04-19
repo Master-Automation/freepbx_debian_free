@@ -59,18 +59,30 @@ check_previous_install() {
     NEED_ASTERISK=0
     NEED_FREEPBX=0
     
-    # Проверка Asterisk
-    if command -v asterisk > /dev/null 2>&1; then
+   # Проверка Asterisk
+if command -v asterisk > /dev/null 2>&1; then
+    # Пробуем проверить через systemctl
+    if systemctl is-active --quiet asterisk 2>/dev/null; then
         ASTERISK_VERSION=$(asterisk -rx "core show version" 2>/dev/null | head -1)
         if [ -n "$ASTERISK_VERSION" ]; then
-            message "   ✅ Asterisk уже установлен: $ASTERISK_VERSION"
+            message "   ✅ Asterisk уже установлен и работает: $ASTERISK_VERSION"
             NEED_ASTERISK=1
         else
-            message "   ⚠️ Asterisk установлен, но не отвечает"
+            message "   ⚠️ Asterisk установлен, но не отвечает на команды"
         fi
     else
-        message "   ⬜ Asterisk не установлен"
+        # Если служба не активна, но бинарник есть
+        message "   ⚠️ Asterisk установлен, но служба не запущена"
+        message "   🔄 Запускаем службу..."
+        systemctl start asterisk
+        if systemctl is-active --quiet asterisk; then
+            message "   ✅ Asterisk запущен"
+            NEED_ASTERISK=1
+        fi
     fi
+else
+    message "   ⬜ Asterisk не установлен"
+fi
     
     # Проверка FreePBX
     if command -v fwconsole > /dev/null 2>&1; then
@@ -916,10 +928,41 @@ if [ -z "$ASTERISK_VERSION" ]; then
     message "   Проверьте статус: systemctl status asterisk"
     exit 1
 fi
-# ==========================================
+
+# ========== ПРОВЕРКА ВЕБ-ИНТЕРФЕЙСА FREEPBX ==========
+setCurrentStep "=== ПРОВЕРКА ВЕБ-ИНТЕРФЕЙСА ==="
+
+# Получаем IP адрес
+SERVER_IP=$(hostname -I | awk '{print $1}')
+
+# Проверяем, что веб-сервер отвечает
+if curl -s -o /dev/null -w "%{http_code}" http://localhost/ | grep -q "200\|302"; then
+    message "   ✅ Веб-сервер Apache отвечает (HTTP 200/302)"
+else
+    message "   ⚠️ Веб-сервер не отвечает, проверьте Apache"
+fi
+
+# Проверяем, что FreePBX отвечает (не просто Apache)
+if curl -s -L http://localhost/admin | grep -qi "freepbx\|login"; then
+    message "   ✅ FreePBX веб-интерфейс доступен"
+else
+    message "   ⚠️ FreePBX веб-интерфейс не отвечает"
+fi
+
+# Проверка через fwconsole
+if command -v fwconsole > /dev/null 2>&1; then
+    if fwconsole ma list &>/dev/null; then
+        message "   ✅ FreePBX модули доступны (fwconsole работает)"
+    else
+        message "   ⚠️ fwconsole не отвечает"
+    fi
+fi
+
+message "   🌐 Веб-интерфейс: http://${SERVER_IP}"
+# ====================================================
 
 message "============================================"
-message "УСТАНОВКА ЗАВЕРШЕНА УСПЕШНО! Время: $execution_time с"
+message "УСТАНОВКА ЗАВЕРШЕНА УСПЕШНО! Время: $execution_time сек."
 message "Веб-интерфейс FreePBX доступен по адресу: http://$(hostname -I | awk '{print $1}')"
 message "Логин: admin, пароль задаётся при первом входе."
 message "============================================"
