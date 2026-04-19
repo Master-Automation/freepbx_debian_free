@@ -744,6 +744,50 @@ else
     mark_step 5 "Установка FreePBX (пропущено)"
 fi
 
+# ========== НАСТРОЙКА FREEPBX ПОСЛЕ УСТАНОВКИ ==========
+setCurrentStep "=== ФИНАЛЬНАЯ НАСТРОЙКА FREEPBX ==="
+
+# 1. Добавляем fwconsole в PATH (если не добавился)
+if [ -f /var/lib/asterisk/bin/fwconsole ]; then
+    ln -sf /var/lib/asterisk/bin/fwconsole /usr/local/bin/fwconsole
+    message "✅ fwconsole добавлен в PATH"
+fi
+
+# 2. Настраиваем базу данных (если пароль не подошёл)
+DB_PASSWORD=$(openssl rand -base64 16 | tr -d '=+/' | cut -c1-16)
+mysql -u root <<EOF
+ALTER USER 'freepbxuser'@'localhost' IDENTIFIED BY '${DB_PASSWORD}';
+FLUSH PRIVILEGES;
+EOF
+
+# 3. Обновляем /etc/freepbx.conf
+if [ -f /etc/freepbx.conf ]; then
+    sed -i "s/\(\$amp_conf\['AMPDBPASS'\] = '\)[^']*';/\1${DB_PASSWORD}';/" /etc/freepbx.conf
+    message "✅ /etc/freepbx.conf обновлён"
+fi
+
+# 4. Перезапускаем FreePBX
+if command -v fwconsole > /dev/null 2>&1; then
+    fwconsole reload
+    message "✅ FreePBX перезагружен"
+else
+    message "⚠️ fwconsole не найден, проверьте установку"
+fi
+message "✅ FreePBX финально настроен"
+# ====================================================
+
+# Удаление коммерческих модулей (оставляем только нужные)
+if [ "$opensourceonly" ]; then
+    setCurrentStep "=== УДАЛЕНИЕ КОММЕРЧЕСКИХ МОДУЛЕЙ (оставляем sysadmin, firewall, customcontexts) ==="
+    keep_modules="sysadmin|firewall|customcontexts"
+    modules_to_remove=$(fwconsole ma list | awk '/Commercial/ {print $2}' | grep -vE "$keep_modules" || true)
+    if [ -n "$modules_to_remove" ]; then
+        echo "$modules_to_remove" | xargs -t -I {} fwconsole ma -f remove {} >> "$log" 2>&1
+        message "Ненужные коммерческие модули удалены. Модули Sysadmin, Firewall и Custom Contexts оставлены."
+    else
+        message "Коммерческие модули для удаления не найдены (или все уже удалены)."
+    fi
+fi
 # Удаление коммерческих модулей (оставляем только нужные)
 if [ "$opensourceonly" ]; then
     setCurrentStep "=== УДАЛЕНИЕ КОММЕРЧЕСКИХ МОДУЛЕЙ (оставляем sysadmin, firewall, customcontexts) ==="
