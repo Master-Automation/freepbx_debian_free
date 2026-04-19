@@ -765,10 +765,12 @@ if [ -f /var/lib/asterisk/bin/fwconsole ]; then
     message "✅ fwconsole добавлен в PATH"
 fi
 
-# 2. Настраиваем базу данных (если пароль не подошёл)
+# 2. Настраиваем базу данных
 DB_PASSWORD=$(openssl rand -base64 16 | tr -d '=+/' | cut -c1-16)
 mysql -u root <<EOF
+CREATE USER IF NOT EXISTS 'freepbxuser'@'localhost' IDENTIFIED BY '${DB_PASSWORD}';
 ALTER USER 'freepbxuser'@'localhost' IDENTIFIED BY '${DB_PASSWORD}';
+GRANT ALL PRIVILEGES ON asterisk.* TO 'freepbxuser'@'localhost';
 FLUSH PRIVILEGES;
 EOF
 
