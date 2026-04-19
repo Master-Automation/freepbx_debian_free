@@ -178,7 +178,12 @@ setup_repositories() {
     fi
     wget -O - http://git.freepbx.asterisk.ru/gpg/aptly-pubkey.asc | gpg --dearmor --yes -o /etc/apt/trusted.gpg.d/freepbx.gpg >> "$log"
 
-    # Полные репозитории Debian от Яндекса (HTTPS)
+    # Очищаем старые репозитории Debian и добавляем новые (Яндекс)
+    # Удаляем строки, начинающиеся с deb или deb-src (кроме FreePBX)
+    sed -i '/^deb /d' /etc/apt/sources.list
+    sed -i '/^deb-src /d' /etc/apt/sources.list
+
+    # Добавляем репозитории Яндекса
     cat >> /etc/apt/sources.list <<EOF
 deb https://mirror.yandex.ru/debian/ bookworm main contrib non-free non-free-firmware
 deb-src https://mirror.yandex.ru/debian/ bookworm main contrib non-free non-free-firmware
@@ -191,7 +196,6 @@ deb-src https://mirror.yandex.ru/debian/ bookworm-updates main contrib non-free 
 EOF
     apt-get update >> "$log"
 }
-
 # Генерация русской локали в системе
 setup_russian_locale() {
     message "Настройка русской локали в системе..."
