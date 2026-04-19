@@ -42,18 +42,13 @@ jobs:
           sed -i "s/SCRIPT_VERSION=\"[0-9.]*\"/SCRIPT_VERSION=\"${{ steps.new.outputs.version }}\"/" russian.sh
           sed -i "s/SCRIPT_DATE=\"[0-9-]*\"/SCRIPT_DATE=\"$(date +%Y-%m-%d)\"/" russian.sh
 
-           - name: Update script version badge in README
+      - name: Update script version badge in README
         run: |
           NEW_VERSION="${{ steps.new.outputs.version }}"
-          # Обновляем бейдж версии скрипта
           sed -i "s/script-[0-9.]*-brightgreen/script-${NEW_VERSION}-brightgreen/" README.md
-          # Обновляем текст "Установок vX.X.X"
           sed -i "s/Установок v[0-9.]*/Установок v${NEW_VERSION}/" README.md
-          # Обновляем параметр version= в URL счётчика
           sed -i "s/version=[0-9.]*/version=${NEW_VERSION}/" README.md
-          # Обновляем простой текст версии в таблице (если есть)
           sed -i "s/версия [0-9.]*/версия ${NEW_VERSION}/" README.md
-          sed -i "s/Версия скрипта [0-9.]*/Версия скрипта ${NEW_VERSION}/" README.md
           echo "✅ Бейдж версии скрипта обновлён: ${NEW_VERSION}"
 
       - name: Update version.hash
