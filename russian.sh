@@ -665,30 +665,42 @@ fwconsole chown >> "$log"
 # Финальное сообщение
 execution_time="$(($(date +%s) - start))"
 
+# ========== КРИТИЧЕСКАЯ ПРОВЕРКА ==========
 # Проверка, что Asterisk действительно установлен
 if ! command -v asterisk > /dev/null 2>&1; then
     message "❌ ОШИБКА: Asterisk не был установлен!"
-    message "Установка не может быть завершена успешно."
+    message "   Установка прервана или завершилась с ошибкой."
+    message "   Лог установки: ${LOG_FILE}"
     exit 1
 fi
 
 # Проверка, что FreePBX установлен
 if ! command -v fwconsole > /dev/null 2>&1; then
     message "❌ ОШИБКА: FreePBX не был установлен!"
-    message "Установка не может быть завершена успешно."
+    message "   Установка прервана или завершилась с ошибкой."
+    message "   Лог установки: ${LOG_FILE}"
     exit 1
 fi
+
+# Проверка версии Asterisk
+ASTERISK_VERSION=$(asterisk -rx "core show version" 2>/dev/null | head -1)
+if [ -z "$ASTERISK_VERSION" ]; then
+    message "❌ ОШИБКА: Asterisk установлен, но не отвечает!"
+    message "   Проверьте статус: systemctl status asterisk"
+    exit 1
+fi
+# ==========================================
 
 message "============================================"
 message "УСТАНОВКА ЗАВЕРШЕНА УСПЕШНО! Время: $execution_time с"
 message "Веб-интерфейс FreePBX доступен по адресу: http://$(hostname -I | awk '{print $1}')"
 message "Логин: admin, пароль задаётся при первом входе."
-message "Русский язык интерфейса и звуки установлены."
 message "============================================"
 fwconsole motd
 
 # Функция отправки статистики
 send_stats() {
+
     # Проверяем, хочет ли пользователь отправить статистику
     echo ""
     echo "❓ Отправить анонимную статистику об успешной установке?"
