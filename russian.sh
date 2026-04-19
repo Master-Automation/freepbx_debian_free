@@ -296,6 +296,31 @@ iptables-persistent iptables-persistent/autosave_v6 boolean true
 EOF
 echo "postfix postfix/mailname string $(hostname -f)" | debconf-set-selections
 echo "postfix postfix/main_mailer_type string 'Internet Site'" | debconf-set-selections
+isinstalled() {
+    PKG_OK=$(dpkg-query -W --showformat='${Status}\n' "$@" 2>/dev/null|grep "install ok installed")
+    [ -n "$PKG_OK" ]
+}
+
+# Функция установки пакета с проверкой
+pkg_install() {
+    log "############################### "
+    PKG=("$@")
+    if isinstalled "${PKG[@]}"; then
+        log "${PKG[*]} уже установлен."
+    else
+        message "Установка ${PKG[*]} ...."
+        apt-get -y --ignore-missing -o DPkg::Options::="--force-confnew" -o Dpkg::Options::="--force-overwrite" install "${PKG[@]}" >> "$log"
+        if isinstalled "${PKG[@]}"; then
+            message "${PKG[*]} установлен успешно."
+        else
+            message "Не удалось установить ${PKG[*]}. Прерывание."
+            terminate
+        fi
+    fi
+    log "############################### "
+}
+
+
 
 pkg_install gnupg
 
