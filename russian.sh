@@ -201,38 +201,54 @@ install_asterisk() {
 
        cd asterisk-${astver}
 
-    # Проверяем кэш собранного Asterisk
-    CACHE_DIR="/var/cache/asterisk-built"
-    if [ -d "$CACHE_DIR/asterisk-${astver}" ]; then
-        message "✅ Использую кэшированную сборку Asterisk"
-        # Копируем из кэша
-        cp -r "$CACHE_DIR/asterisk-${astver}" /usr/src/
-        cd /usr/src/asterisk-${astver}
-        
-        # Проверяем, что сборка валидна
-        if [ -f "main/libasteriskssl.so.1" ] && [ -f "pbx/pbx_config" ]; then
-            message "   ✅ Кэш валиден, устанавливаем..."
-            make install
-            if [ $? -eq 0 ]; then
-                message "   ✅ Установка из кэша успешна"
-                make config
-                ldconfig
-                return 0
-            else
-                message "   ⚠️ Ошибка установки из кэша, удаляем кэш и собираем заново"
-                rm -rf "$CACHE_DIR/asterisk-${astver}"
-            fi
-        else
-            message "   ⚠️ Кэш повреждён, удаляем и собираем заново"
-            rm -rf "$CACHE_DIR/asterisk-${astver}"
-        fi
-    fi
-    
-    # Установка зависимостей для сборки (с fallback)
+      # Установка зависимостей для сборки (с fallback и диагностикой)
     message "Установка зависимостей для сборки..."
-    if ! ./contrib/scripts/install_prereq install 2>&1; then
-        message "⚠️ Автоматическая установка зависимостей не удалась, пробуем вручную..."
+    
+    # Пытаемся выполнить автоматическую установку
+    message "   Попытка 1/2: автоматическая установка (install_prereq)..."
+    if ./contrib/scripts/install_prereq install 2>&1 | tee -a "$log"; then
+        message "   ✅ Зависимости успешно установлены автоматически."
+    else
+        message "   ⚠️ Автоматическая установка не удалась."
+        
+        # Диагностика причин
+        message ""
+        message "   🔍 Диагностика причин:"
+        
+        # Проверка интернета
+        if curl -s --connect-timeout 5 https://deb.debian.org > /dev/null 2>&1; then
+            message "      ✅ Интернет доступен"
+        else
+            message "      ❌ Интернет НЕ доступен (проверьте соединение)"
+        fi
+        
+        # Проверка прав
+        if [ -w /tmp ]; then
+            message "      ✅ Права на запись есть"
+        else
+            message "      ❌ Нет прав на запись в /tmp"
+        fi
+        
+        # Проверка Python
+        if command -v python3 > /dev/null 2>&1; then
+            message "      ✅ Python3 установлен"
+        else
+            message "      ❌ Python3 НЕ установлен"
+        fi
+        
+        # Проверка apt
+        if command -v apt-get > /dev/null 2>&1; then
+            message "      ✅ apt-get доступен"
+        else
+            message "      ❌ apt-get НЕ доступен"
+        fi
+        
+        message ""
+        message "   Попытка 2/2: ручная установка зависимостей (apt-get)..."
+        
         apt-get update -y
+        
+        message "   Установка пакетов (это может занять 2-3 минуты)..."
         apt-get install -y \
             build-essential \
             cmake \
@@ -270,17 +286,21 @@ install_asterisk() {
             libldap2-dev \
             libtool \
             autoconf \
-            pkg-config
+            pkg-config 2>&1 | tee -a "$log"
         
-        if [ $? -ne 0 ]; then
-            message "❌ ОШИБКА: Не удалось установить зависимости для сборки Asterisk."
+        if [ $? -eq 0 ]; then
+            message "   ✅ Зависимости успешно установлены вручную."
+        else
+            message "   ❌ ОШИБКА: Не удалось установить зависимости для сборки Asterisk."
+            message ""
+            message "   Что делать:"
+            message "   1. Проверьте интернет: ping -c 4 deb.debian.org"
+            message "   2. Обновите список пакетов: sudo apt-get update"
+            message "   3. Установите вручную: sudo apt-get install -y build-essential libedit-dev uuid-dev libjansson-dev libxml2-dev libsqlite3-dev"
+            message "   4. Затем перезапустите скрипт: sudo ./russian.sh --skipversion --opensourceonly"
             exit 1
         fi
-        message "✅ Зависимости успешно установлены вручную."
-    else
-        message "✅ Зависимости успешно установлены автоматически."
     fi
-
     message "Конфигурация Asterisk..."
     ./configure --libdir=/usr/lib64 --with-pjproject-bundled
     if [ $? -ne 0 ]; then
