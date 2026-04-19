@@ -154,7 +154,7 @@ install_asterisk() {
     make menuselect.makeopts
     menuselect/menuselect --enable chan_pjsip --enable res_srtp --enable res_http_websocket --enable codec_opus --enable codec_g729a --enable format_mp3
     message "Компиляция Asterisk (самый долгий этап)..."
-    make -j2
+    make -j$(nproc)
     make install
     make config
     ldconfig
