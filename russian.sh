@@ -393,24 +393,42 @@ setup_repositories() {
         REPO_URL="$FALLBACK_URL"
     fi
     
-    # Добавляем репозиторий
-    if ! grep -qsF "deb [arch=amd64] ${REPO_URL}/freepbx17-prod bookworm main" /etc/apt/sources.list; then
-        echo "deb [arch=amd64] ${REPO_URL}/freepbx17-prod bookworm main" | tee -a /etc/apt/sources.list >> "$log"
+    # Добавляем репозиторий (в отдельный файл, чтобы не затереть)
+    REPO_FILE="/etc/apt/sources.list.d/freepbx.list"
+    if ! grep -qsF "${REPO_URL}/freepbx17-prod" "$REPO_FILE" 2>/dev/null; then
+        echo "deb [arch=amd64] ${REPO_URL}/freepbx17-prod bookworm main" | tee "$REPO_FILE" >> "$log"
+        message "   ✅ Репозиторий добавлен в $REPO_FILE"
+    else
+        message "   ℹ️ Репозиторий уже существует"
     fi
     
-    # Скачиваем ключ (с fallback)
-    if ! wget -O - "${REPO_URL}/gpg/aptly-pubkey.asc" 2>/dev/null | gpg --dearmor --yes -o /etc/apt/trusted.gpg.d/freepbx.gpg >> "$log" 2>&1; then
-        message "   ⚠️ Не удалось скачать ключ из ${REPO_URL}, пробую из зеркала..."
-        wget -O - "${MIRROR_URL}/gpg/aptly-pubkey.asc" 2>/dev/null | gpg --dearmor --yes -o /etc/apt/trusted.gpg.d/freepbx.gpg >> "$log" 2>&1 || \
-        wget -O - "${FALLBACK_URL}/gpg/aptly-pubkey.asc" 2>/dev/null | gpg --dearmor --yes -o /etc/apt/trusted.gpg.d/freepbx.gpg >> "$log" 2>&1
+    # Скачиваем ключ (современный способ для Debian 12)
+    GPG_FILE="/etc/apt/trusted.gpg.d/freepbx.gpg"
+    if [ ! -f "$GPG_FILE" ]; then
+        message "   Добавление GPG ключа репозитория..."
+        # Пробуем скачать ключ из разных источников
+        if wget -q -O /tmp/freepbx.asc "${REPO_URL}/gpg/aptly-pubkey.asc" 2>/dev/null || \
+           wget -q -O /tmp/freepbx.asc "${MIRROR_URL}/gpg/aptly-pubkey.asc" 2>/dev/null || \
+           wget -q -O /tmp/freepbx.asc "${FALLBACK_URL}/gpg/aptly-pubkey.asc" 2>/dev/null; then
+            gpg --dearmor -o "$GPG_FILE" < /tmp/freepbx.asc >> "$log" 2>&1
+            rm -f /tmp/freepbx.asc
+            message "   ✅ GPG ключ добавлен"
+        else
+            message "   ⚠️ Не удалось добавить GPG ключ (продолжаем без него)"
+        fi
+    else
+        message "   ℹ️ GPG ключ уже существует"
     fi
 
+    # Настройка репозиториев Debian на зеркало Яндекса
     message "Замена репозиториев Debian на зеркало Яндекса (mirror.yandex.ru)..."
-    # Удаляем старые строки deb и deb-src (кроме строки FreePBX)
+    # Сохраняем бэкап оригинального sources.list
+    cp /etc/apt/sources.list /etc/apt/sources.list.bak 2>/dev/null
+    # Удаляем старые строки deb и deb-src
     sed -i '/^deb /d' /etc/apt/sources.list
     sed -i '/^deb-src /d' /etc/apt/sources.list
 
-    cat >> /etc/apt/sources.list <<EOF
+    cat > /etc/apt/sources.list <<EOF
 deb https://mirror.yandex.ru/debian/ bookworm main contrib non-free non-free-firmware
 deb-src https://mirror.yandex.ru/debian/ bookworm main contrib non-free non-free-firmware
 
@@ -420,7 +438,10 @@ deb-src https://mirror.yandex.ru/debian-security/ bookworm-security main contrib
 deb https://mirror.yandex.ru/debian/ bookworm-updates main contrib non-free non-free-firmware
 deb-src https://mirror.yandex.ru/debian/ bookworm-updates main contrib non-free non-free-firmware
 EOF
-    apt-get update >> "$log"
+
+    # Обновляем список пакетов
+    message "Обновление списка пакетов (apt-get update)..."
+    apt-get update >> "$log" 2>&1
     message "Репозитории настроены."
 }
 
