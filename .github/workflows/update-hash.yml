@@ -7,7 +7,6 @@ on:
     branches:
       - master
       - main
-  workflow_dispatch:  # Это позволяет запускать вручную
 
 jobs:
   update:
@@ -16,45 +15,37 @@ jobs:
       contents: write
     
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4.2.2  # Обновлённая версия
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Get current date
-        id: date
-        run: |
-          echo "date=$(TZ='Europe/Moscow' date '+%d.%m.%Y')" >> $GITHUB_OUTPUT
       
       - name: Calculate hash
         id: hash
         run: |
           HASH=$(sha256sum russian.sh | awk '{print $1}')
           echo "hash=$HASH" >> $GITHUB_OUTPUT
+          echo "✅ Новый хеш: $HASH"
       
-      - name: Get version from script
-        id: version
+      - name: Update version.hash file
         run: |
-          VERSION=$(grep -oP 'SCRIPT_VERSION="\K[0-9.]+' russian.sh || echo "1.0.0")
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "${{ steps.hash.outputs.hash }}" > version.hash
+          echo "✅ version.hash обновлён"
       
-      - name: Update README
+      - name: Update hash in README table
         run: |
-          # Обновляем дату
-          sed -i "s/[0-9]{2}\.[0-9]{2}\.[0-9]{4}/${{ steps.date.outputs.date }}/" README.md || true
-          
-          # Обновляем версию
-          sed -i "s/версия [0-9.]*/версия ${{ steps.version.outputs.version }}/" README.md
-          
-          # Обновляем хеш
-          sed -i "s/EXPECTED=\"[a-f0-9]*\"/EXPECTED=\"${{ steps.hash.outputs.hash }}\"/g" README.md
-          sed -i "s/248bace4de3f816c6685ccdccd55dd8afadb2a7812934141c8e2cc878406c292/${{ steps.hash.outputs.hash }}/g" README.md
+          # Обновляем хеш в таблице README
+          sed -i "s/`[a-f0-9]\{64\}`/`${{ steps.hash.outputs.hash }}`/" README.md
+          echo "✅ Хеш в README обновлён"
       
-      - name: Commit changes
+      - name: Update hash status badge
+        run: |
+          # Опционально: обновляем бейдж статуса (он всегда зелёный, так как хеш актуален)
+          sed -i "s|хеш-[а-я]*-|хеш-актуален-|" README.md
+      
+      - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add README.md
-          git diff --cached --quiet || git commit -m "🤖 Автообновление от ${{ steps.date.outputs.date }} [skip ci]"
+          git add version.hash README.md
+          git diff --cached --quiet || git commit -m "🤖 Автообновление хеша: ${{ steps.hash.outputs.hash }} [skip ci]"
           git push
