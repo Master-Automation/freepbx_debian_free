@@ -510,3 +510,32 @@ message "Логин: admin, пароль задаётся при первом в
 message "Русский язык интерфейса и звуки установлены."
 message "============================================"
 fwconsole motd
+
+# Функция отправки статистики
+send_stats() {
+    # Проверяем, хочет ли пользователь отправить статистику
+    echo ""
+    echo "❓ Отправить анонимную статистику об успешной установке?"
+    echo "   (это поможет улучшить скрипт)"
+    read -p "   Отправить? (y/n): " -n 1 -r
+    echo ""
+    
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        # Получаем версию из скрипта
+        VERSION=$(grep -oP 'SCRIPT_VERSION="\K[0-9.]+' "$0" || echo "unknown")
+        
+        # Отправляем счётчик для конкретной версии
+        curl -s "https://api.countapi.xyz/hit/master-automation/freepbx_install/version_${VERSION}" > /dev/null
+        
+        # Отправляем общий счётчик
+        curl -s "https://api.countapi.xyz/hit/master-automation/freepbx_install/total" > /dev/null
+        
+        echo "✅ Спасибо! Статистика отправлена."
+        echo "   Всего установок версии ${VERSION}: $(curl -s https://api.countapi.xyz/get/master-automation/freepbx_install/version_${VERSION} | grep -oP '"value":\K\d+')"
+    else
+        echo "ℹ️ Статистика не отправлена."
+    fi
+}
+
+# Вызываем функцию в конце успешной установки
+send_stats
