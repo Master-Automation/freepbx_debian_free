@@ -1,4 +1,4 @@
-name: Auto-update README hash
+name: Auto-update README hash and version
 
 on:
   push:
@@ -10,56 +10,46 @@ on:
   workflow_dispatch:
 
 jobs:
-  update-hash-in-readme:
+  update:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v4
       
-      - name: Calculate SHA256 hash of russian.sh
-        id: hash
+      - name: Extract version from script
+        id: version
         run: |
-          HASH=$(sha256sum russian.sh | awk '{print $1}')
+          # Ищем строку с SCRIPT_VERSION
+          VERSION=$(grep -oP 'SCRIPT_VERSION="\K[^"]+' russian.sh || echo "unknown")
+          DATE=$(grep -oP 'SCRIPT_DATE="\K[^"]+' russian.sh || date +%Y-%m-%d)
+          HASH=$(sha256sum russian.sh | cut -d' ' -f1)
+          
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "date=$DATE" >> $GITHUB_OUTPUT
           echo "hash=$HASH" >> $GITHUB_OUTPUT
-          echo "✅ Новый хеш: $HASH"
+          
+          echo "✅ Версия скрипта: $VERSION"
+          echo "✅ Дата версии: $DATE"
+          echo "✅ Хеш: ${HASH:0:16}..."
       
-      - name: Get current date and time
-        id: date
+      - name: Update README
         run: |
-          # Получаем дату и время в московском времени (UTC+3)
-          DATE=$(TZ='Europe/Moscow' date '+%Y-%m-%d %H:%M:%S')
-          DATE_RU=$(TZ='Europe/Moscow' date '+%d.%m.%Y %H:%M:%S')
-          echo "datetime=$DATE" >> $GITHUB_OUTPUT
-          echo "datetime_ru=$DATE_RU" >> $GITHUB_OUTPUT
-          echo "📅 Дата: $DATE_RU"
-      
-      - name: Update hash in README
-        run: |
+          # Обновляем версию
+          sed -i "s/Версия скрипта: [0-9.]*/Версия скрипта: ${{ steps.version.outputs.version }}/g" README.md
+          sed -i "s/SCRIPT_VERSION=\"[0-9.]*\"/SCRIPT_VERSION=\"${{ steps.version.outputs.version }}\"/g" README.md
+          
+          # Обновляем дату
+          sed -i "s/Дата релиза: [0-9-]*/Дата релиза: ${{ steps.version.outputs.date }}/g" README.md
+          
           # Обновляем хеш
-          sed -i 's/EXPECTED="[a-f0-9]\{64\}"/EXPECTED="${{ steps.hash.outputs.hash }}"/g' README.md
-          sed -i 's/248bace4de3f816c6685ccdccd55dd8afadb2a7812934141c8e2cc878406c292/${{ steps.hash.outputs.hash }}/g' README.md
-          
-          # Обновляем дату (если есть маркер)
-          sed -i 's/<!-- LAST_UPDATE -->.*<!-- \/LAST_UPDATE -->/<!-- LAST_UPDATE -->${{ steps.date.outputs.datetime_ru }}<!-- \/LAST_UPDATE -->/' README.md
-          sed -i 's/<!-- UPDATE_TIMESTAMP -->/<!-- UPDATE_TIMESTAMP -->\n**Обновлено:** ${{ steps.date.outputs.datetime_ru }}/' README.md
-          
-          echo "✅ Хеш и дата обновлены"
+          sed -i "s/EXPECTED=\"[a-f0-9]*\"/EXPECTED=\"${{ steps.version.outputs.hash }}\"/g" README.md
+          sed -i "s/248bace4de3f816c6685ccdccd55dd8afadb2a7812934141c8e2cc878406c292/${{ steps.version.outputs.hash }}/g" README.md
       
-      - name: Commit and push
+      - name: Commit changes
         run: |
-          git config --local user.name "github-actions[bot]"
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           git add README.md
-          
-          if git diff --cached --quiet; then
-            echo "ℹ️ Нет изменений"
-          else
-            git commit -m "🤖 Обновление хеша и даты (${{ steps.date.outputs.datetime_ru }}) [skip ci]"
-            git push
-            echo "✅ Обновлено: ${{ steps.date.outputs.datetime_ru }}"
-          fi
+          git diff --cached --quiet || git commit -m "🤖 Обновление до версии ${{ steps.version.outputs.version }} [skip ci]"
+          git push
