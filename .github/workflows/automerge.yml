@@ -1,0 +1,33 @@
+name: Auto-merge Dependabot PRs
+
+on:
+  pull_request:
+    types: [labeled, opened, synchronize, reopened]
+
+jobs:
+  automerge:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      
+    steps:
+      - name: Check if PR is from Dependabot
+        id: dependabot
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            return pr.user.login === 'dependabot[bot]';
+            
+      - name: Auto-merge Dependabot PRs
+        if: steps.dependabot.outputs.result == 'true'
+        run: |
+          gh pr merge --auto --merge "$PR_URL"
+        env:
+          PR_URL: ${{github.event.pull_request.html_url}}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
