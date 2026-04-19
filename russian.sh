@@ -199,7 +199,34 @@ install_asterisk() {
         fi
     done
 
-    cd asterisk-${astver}
+       cd asterisk-${astver}
+
+    # Проверяем кэш собранного Asterisk
+    CACHE_DIR="/var/cache/asterisk-built"
+    if [ -d "$CACHE_DIR/asterisk-${astver}" ]; then
+        message "✅ Использую кэшированную сборку Asterisk"
+        # Копируем из кэша
+        cp -r "$CACHE_DIR/asterisk-${astver}" /usr/src/
+        cd /usr/src/asterisk-${astver}
+        
+        # Проверяем, что сборка валидна
+        if [ -f "main/libasteriskssl.so.1" ] && [ -f "pbx/pbx_config" ]; then
+            message "   ✅ Кэш валиден, устанавливаем..."
+            make install
+            if [ $? -eq 0 ]; then
+                message "   ✅ Установка из кэша успешна"
+                make config
+                ldconfig
+                return 0
+            else
+                message "   ⚠️ Ошибка установки из кэша, удаляем кэш и собираем заново"
+                rm -rf "$CACHE_DIR/asterisk-${astver}"
+            fi
+        else
+            message "   ⚠️ Кэш повреждён, удаляем и собираем заново"
+            rm -rf "$CACHE_DIR/asterisk-${astver}"
+        fi
+    fi
     
     # Установка зависимостей для сборки (с fallback)
     message "Установка зависимостей для сборки..."
@@ -247,10 +274,6 @@ install_asterisk() {
         
         if [ $? -ne 0 ]; then
             message "❌ ОШИБКА: Не удалось установить зависимости для сборки Asterisk."
-            message "Что делать: попробуйте выполнить вручную:"
-            message "sudo apt-get update"
-            message "sudo apt-get install -y build-essential libedit-dev uuid-dev libjansson-dev libxml2-dev libsqlite3-dev"
-            message "Затем перезапустите скрипт."
             exit 1
         fi
         message "✅ Зависимости успешно установлены вручную."
@@ -271,8 +294,7 @@ install_asterisk() {
     message "Загрузка библиотеки для поддержки MP3..."
     contrib/scripts/get_mp3_source.sh
 
-      
-      message "Компиляция Asterisk (самый долгий этап)..."
+    message "Компиляция Asterisk (самый долгий этап)..."
     make -j$(nproc)
     if [ $? -ne 0 ]; then
         message "❌ ОШИБКА: Не удалось скомпилировать Asterisk."
@@ -281,13 +303,10 @@ install_asterisk() {
         exit 1
     fi
     
-    # Отключаем автоматическое скачивание кодеков (сервер digium.com часто недоступен)
+    # Отключаем автоматическое скачивание кодеков
     export CODEC_OPUS_DOWNLOAD_DISABLE=1
     export CODEC_G729_DOWNLOAD_DISABLE=1
     export CODEC_SILK_DOWNLOAD_DISABLE=1
-    
-    message "ℹ️ Кодеки Opus/G.729 пропущены (стандартные кодеки ulaw/alaw/gsm уже установлены)"
-    message "   При необходимости кодеки можно установить позже: sudo apt install asterisk-opus"
     
     message "Установка Asterisk..."
     make install
@@ -296,14 +315,11 @@ install_asterisk() {
         exit 1
     fi
     
-    # Установка бесплатного open-source кодека Opus из репозитория Debian
-    message "Установка open-source кодека Opus из репозитория Debian..."
-    apt-get install -y asterisk-opus libopus-dev 2>&1 | tee -a "$log"
-    if [ $? -eq 0 ]; then
-        message "   ✅ Opus установлен (бесплатная open-source версия)"
-    else
-        message "   ⚠️ Не удалось установить Opus, продолжаем без него"
-    fi
+    # Сохраняем в кэш после успешной установки
+    message "Сохраняем собранный Asterisk в кэш..."
+    mkdir -p "$CACHE_DIR"
+    cp -r /usr/src/asterisk-${astver} "$CACHE_DIR/"
+    message "   ✅ Кэш сохранён в $CACHE_DIR/asterisk-${astver}"
     
     make config
     ldconfig
