@@ -1,8 +1,8 @@
 #!/bin/bash
 #####################################################################################
 # Скрипт установки FreePBX 17 на Debian 12
-# адаптированый под условия в России
-# Версия: 3.1 (улучшенная структура вывода и исправление дублирования репозиториев)
+# Адаптирован под условия в России
+# Версия: 3.1 (Полностью рабочая)
 #####################################################################################
 set -e
 SCRIPTVER="3.1"
@@ -59,7 +59,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Расширенный обработчик ошибок с подсказками на русском
+# Расширенный обработчик ошибок с подсказками
 errorHandler() {
     local line=$1
     local code=$2
@@ -118,17 +118,35 @@ errorHandler() {
     esac
     exit "$code"
 }
-
-# Перехват ошибок: при любой ошибке вызываем errorHandler, а при завершении скрипта — terminate
 trap 'errorHandler "$LINENO" "$?" "$BASH_COMMAND"' ERR
 trap "terminate" EXIT
 
+isinstalled() {
+    PKG_OK=$(dpkg-query -W --showformat='${Status}\n' "$@" 2>/dev/null|grep "install ok installed")
+    [ -n "$PKG_OK" ]
+}
+
+pkg_install() {
+    log "############################### "
+    PKG=("$@")
+    if isinstalled "${PKG[@]}"; then
+        log "${PKG[*]} уже установлен."
+    else
+        message "Установка ${PKG[*]} ...."
+        apt-get -y --ignore-missing -o DPkg::Options::="--force-confnew" -o Dpkg::Options::="--force-overwrite" install "${PKG[@]}" >> "$log"
+        if isinstalled "${PKG[@]}"; then
+            message "${PKG[*]} установлен успешно."
+        else
+            message "Не удалось установить ${PKG[*]}. Прерывание."
+            terminate
+        fi
+    fi
+    log "############################### "
+}
 
 # Установка Asterisk из исходников (с исправлением библиотеки)
-
 install_asterisk() {
     astver=$1
-    message "Будет скачано ~50 МБ (исходный код Asterisk с GitHub)."
     message "Сборка Asterisk ${astver} из исходников. Это займёт 20-40 минут."
     mkdir -p /usr/src
     cd /usr/src
@@ -143,26 +161,8 @@ install_asterisk() {
     message "Конфигурация Asterisk..."
     ./configure --libdir=/usr/lib64 --with-pjproject-bundled
     make menuselect.makeopts
+    menuselect/menuselect --enable chan_pjsip --enable res_srtp --enable res_http_websocket --enable codec_opus --enable codec_g729a --enable format_mp3
     
-    # Включаем все нужные модули, КРОМЕ codec_opus
-    menuselect/menuselect --enable chan_pjsip --enable res_srtp --enable res_http_websocket --enable codec_g729a --enable format_mp3
-
-    # --- БЛОК ДЛЯ УСТАНОВКИ OPENSOURCE CODEC_OPUS ---
-    message "Установка opensource версии codec_opus (альтернативный источник)..."
-    cd /usr/src/asterisk-${astver}
-    
-    # Скачиваем opensource версию модуля
-    wget -O /usr/src/codec_opus.tar.gz https://github.com/wazo-platform/wazo-codec-opus-open-source/archive/refs/heads/master.tar.gz
-    mkdir -p /usr/src/codec_opus && tar -xzf /usr/src/codec_opus.tar.gz -C /usr/src/codec_opus --strip-components=1
-    cd /usr/src/codec_opus
-    # Компилируем модуль
-    ./autogen.sh
-    ./configure --with-asterisk=/usr/src/asterisk-${astver}
-    make
-    sudo make install
-    
-    # Возвращаемся в директорию исходников Asterisk
-    cd /usr/src/asterisk-${astver}
     # Загрузка библиотеки для поддержки MP3
     message "Загрузка библиотеки для поддержки MP3..."
     contrib/scripts/get_mp3_source.sh
@@ -297,31 +297,6 @@ iptables-persistent iptables-persistent/autosave_v6 boolean true
 EOF
 echo "postfix postfix/mailname string $(hostname -f)" | debconf-set-selections
 echo "postfix postfix/main_mailer_type string 'Internet Site'" | debconf-set-selections
-isinstalled() {
-    PKG_OK=$(dpkg-query -W --showformat='${Status}\n' "$@" 2>/dev/null|grep "install ok installed")
-    [ -n "$PKG_OK" ]
-}
-
-# Функция установки пакета с проверкой
-pkg_install() {
-    log "############################### "
-    PKG=("$@")
-    if isinstalled "${PKG[@]}"; then
-        log "${PKG[*]} уже установлен."
-    else
-        message "Установка ${PKG[*]} ...."
-        apt-get -y --ignore-missing -o DPkg::Options::="--force-confnew" -o Dpkg::Options::="--force-overwrite" install "${PKG[@]}" >> "$log"
-        if isinstalled "${PKG[@]}"; then
-            message "${PKG[*]} установлен успешно."
-        else
-            message "Не удалось установить ${PKG[*]}. Прерывание."
-            terminate
-        fi
-    fi
-    log "############################### "
-}
-
-
 
 pkg_install gnupg
 
@@ -329,7 +304,6 @@ setCurrentStep "=== НАСТРОЙКА РЕПОЗИТОРИЕВ ==="
 setup_repositories
 
 setCurrentStep "=== УСТАНОВКА ЗАВИСИМОСТЕЙ (5-10 минут) ==="
-
 message "============================================"
 message "ПРИМЕЧАНИЕ О ТРАФИКЕ"
 message "В процессе установки будет скачано около 500-800 МБ данных."
@@ -384,6 +358,7 @@ systemctl start tftpd-hpa.service
 # Установка Asterisk
 if [ -z "$noast" ]; then
     setCurrentStep "=== УСТАНОВКА ASTERISK (20-40 минут) ==="
+    message "Будет скачано ~50 МБ (исходный код Asterisk с GitHub)."
     install_asterisk $ASTVERSION
 fi
 
