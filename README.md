@@ -57,32 +57,7 @@ Your Open Source Asterisk PBX GUI Solution
 Скопируйте и выполните в терминале Debian 12 одну команду:
 
 ```
-curl -sL https://raw.githubusercontent.com/Master-Automation/sng_freepbx_debian_install/master/russian.sh -o russian.sh && EXPECTED="4df5b9f67f0e6d5e2d8b6e2b7c0a5c4e9f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6" && ACTUAL=$(sha256sum russian.sh | awk '{print $1}') && if [ "$ACTUAL" = "$EXPECTED" ]; then echo "✅ Контрольная сумма совпадает. Скрипт подлинный."; else echo "❌ ОШИБКА: Контрольная сумма не совпадает! Скрипт мог быть повреждён или подменён."; exit 1; fi && chmod +x russian.sh && sudo ./russian.sh --skipversion --opensourceonly
-Важно: Хеш автоматически обновляется при каждом изменении скрипта. Вам не нужно сверять его вручную.
-```
-
-### 🧑‍💻 Пошаговая ручная установка (для опытных пользователей)
-1. Скачайте скрипт:
-
-```
-wget --no-check-certificate https://raw.githubusercontent.com/Master-Automation/sng_freepbx_debian_install/master/russian.sh -O russian.sh
-Проверьте целостность скрипта (рекомендуется):
-```
-2. Получите значение хэша скачанного скрипта
-```
-sha256sum russian.sh
-```
-Сравните с текущим: EXPECTED="38ba9b6fc8fa58fc4f173981d0f574f0daee51432211d6d38ac4ebf8d5e1f669"  
-**📅 Последнее обновление скрипта:** `<!-- LAST_UPDATE -->`
-
-3. Сделайте скрипт исполняемым:
-```
-chmod +x russian.sh
-```
-
-4. Запустите установку:
-```
-sudo ./russian.sh --skipversion --opensourceonly
+bash <(curl -sL https://raw.githubusercontent.com/Master-Automation/freepbx_debian_free/master/install.sh)
 ```
 
 Пояснение параметров:
