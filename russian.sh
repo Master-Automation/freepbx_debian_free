@@ -1,6 +1,7 @@
 #!/bin/bash
 #####################################################################################
-# Адаптированный скрипт установки FreePBX 17 на Debian 12
+# Скрипт установки FreePBX 17 на Debian 12
+# адаптированый под условия в России
 # Версия: 3.0 (с расширенной обработкой ошибок и подсказками)
 #####################################################################################
 set -e
@@ -170,20 +171,17 @@ install_asterisk() {
 
 # Настройка репозиториев
 setup_repositories() {
-    message "Настройка репозиториев..."
-
-    # Репозиторий FreePBX (российское зеркало)
+    message "Добавление репозитория FreePBX = http://git.freepbx.asterisk.ru/freepbx17-prod bookworm main"
     if ! grep -qsF "deb [arch=amd64] http://git.freepbx.asterisk.ru/freepbx17-prod bookworm main" /etc/apt/sources.list; then
         echo "deb [arch=amd64] http://git.freepbx.asterisk.ru/freepbx17-prod bookworm main" | tee -a /etc/apt/sources.list >> "$log"
     fi
     wget -O - http://git.freepbx.asterisk.ru/gpg/aptly-pubkey.asc | gpg --dearmor --yes -o /etc/apt/trusted.gpg.d/freepbx.gpg >> "$log"
 
-    # Очищаем старые репозитории Debian и добавляем новые (Яндекс)
-    # Удаляем строки, начинающиеся с deb или deb-src (кроме FreePBX)
+    message "Замена репозиториев Debian на зеркало Яндекса..."
+    # Удаляем старые строки deb и deb-src (оставляем только FreePBX)
     sed -i '/^deb /d' /etc/apt/sources.list
     sed -i '/^deb-src /d' /etc/apt/sources.list
 
-    # Добавляем репозитории Яндекса
     cat >> /etc/apt/sources.list <<EOF
 deb https://mirror.yandex.ru/debian/ bookworm main contrib non-free non-free-firmware
 deb-src https://mirror.yandex.ru/debian/ bookworm main contrib non-free non-free-firmware
@@ -195,6 +193,7 @@ deb https://mirror.yandex.ru/debian/ bookworm-updates main contrib non-free non-
 deb-src https://mirror.yandex.ru/debian/ bookworm-updates main contrib non-free non-free-firmware
 EOF
     apt-get update >> "$log"
+    message "Репозитории настроены."
 }
 # Генерация русской локали в системе
 setup_russian_locale() {
