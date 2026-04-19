@@ -39,6 +39,7 @@ jobs:
         run: |
           NEW="${{ steps.bump.outputs.new }}"
           sed -i "s/SCRIPT_VERSION=\"[0-9.]*\"/SCRIPT_VERSION=\"$NEW\"/" russian.sh
+          sed -i "s/версия-[0-9.]*-brightgreen/версия-$NEW-brightgreen/" README.md
           sed -i "s/script-[0-9.]*-brightgreen/script-$NEW-brightgreen/" README.md
           sed -i "s/Установок v[0-9.]*/Установок v$NEW/" README.md
           sed -i "s/| Версия скрипта | [0-9.]* /| Версия скрипта | $NEW /" README.md
