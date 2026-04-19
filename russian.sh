@@ -604,6 +604,21 @@ fwconsole chown >> "$log"
 
 # Финальное сообщение
 execution_time="$(($(date +%s) - start))"
+
+# Проверка, что Asterisk действительно установлен
+if ! command -v asterisk > /dev/null 2>&1; then
+    message "❌ ОШИБКА: Asterisk не был установлен!"
+    message "Установка не может быть завершена успешно."
+    exit 1
+fi
+
+# Проверка, что FreePBX установлен
+if ! command -v fwconsole > /dev/null 2>&1; then
+    message "❌ ОШИБКА: FreePBX не был установлен!"
+    message "Установка не может быть завершена успешно."
+    exit 1
+fi
+
 message "============================================"
 message "УСТАНОВКА ЗАВЕРШЕНА УСПЕШНО! Время: $execution_time с"
 message "Веб-интерфейс FreePBX доступен по адресу: http://$(hostname -I | awk '{print $1}')"
