@@ -308,8 +308,12 @@ install_asterisk() {
         exit 1
     fi
     
-    make menuselect.makeopts
-    menuselect/menuselect --enable chan_pjsip --enable res_srtp --enable res_http_websocket --enable codec_opus --enable codec_g729a --enable format_mp3
+     make menuselect.makeopts
+    # Отключаем кодеки, требующие скачивания с digium.com (сервер недоступен из РФ)
+    menuselect/menuselect --enable chan_pjsip --enable res_srtp --enable res_http_websocket --enable format_mp3
+    menuselect/menuselect --disable codec_opus --disable codec_g729a
+    message "   ⚠️ Кодеки Opus и G.729 отключены (сервер downloads.digium.com недоступен)"
+    message "   ✅ Open-source Opus будет установлен позже из репозитория Debian"
 
     message "Загрузка библиотеки для поддержки MP3..."
     contrib/scripts/get_mp3_source.sh
