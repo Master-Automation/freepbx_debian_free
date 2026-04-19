@@ -1,0 +1,15 @@
+# Логи
+*.log
+/var/log/pbx/
+
+# Временные файлы
+*.tmp
+*.bak
+
+# Файлы установки
+russian.sh
+version.hash.tmp
+
+# IDE
+.vscode/
+.idea/
