@@ -12,8 +12,6 @@ Your Open Source Asterisk PBX GUI Solution
 
 ## 📊 Информация о проекте
 
-## 📊 Информация о проекте
-
 | Параметр | Значение |
 |----------|----------|
 | **📅 Обновлено** | ![Last Commit](https://img.shields.io/github/last-commit/Master-Automation/freepbx_debian_free) |
