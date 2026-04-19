@@ -18,9 +18,10 @@ Your Open Source Asterisk PBX GUI Solution
 | **📦 Версия** | ![Version](https://img.shields.io/badge/version-1.0.0-blue) |
 | **📜 Лицензия** | ![License](https://img.shields.io/badge/license-GPLv3-red) |
 | **✅ Статус сборки** | [![CI](https://github.com/Master-Automation/freepbx_debian_free/actions/workflows/auto-version.yml/badge.svg)](https://github.com/Master-Automation/freepbx_debian_free/actions/workflows/auto-version.yml) |
-| **📊 Кол-во установок текущей версии** | [![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2FMaster-Automation%2Ffreepbx_debian_free%2Frussian.sh%3Fversion%3D1.0.0&title=Установок&edge_flat=false)](https://hits.seeyoufarm.com) |
-| **📈 Кол-во установок всего** | [![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2FMaster-Automation%2Ffreepbx_debian_free%2Frussian.sh&title=Всего&edge_flat=false)](https://hits.seeyoufarm.com) |
-</div>
+| **📊 Установок (тек. версия)** | [![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2FMaster-Automation%2Ffreepbx_debian_free%2Frussian.sh%3Fversion%3D1.0.0&title=Установок&edge_flat=false)](https://hits.seeyoufarm.com) |
+| **📈 Всего установок** | [![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2FMaster-Automation%2Ffreepbx_debian_free%2Frussian.sh&title=Всего&edge_flat=false)](https://hits.seeyoufarm.com) |
+| **🔒 Хеш скрипта** | [![Hash Status](https://img.shields.io/badge/хеш-актуален-brightgreen)](https://github.com/Master-Automation/freepbx_debian_free/blob/master/version.hash) |
+| **🔑 Текущий хеш** | `fcec78301b83fc5e357eace1ed6dd7a96eb6eb1ea02c4b33ecacdb2e5243f894` |
 
 > 📈 Данные обновляются автоматически после каждой успешной установки.
 > Отправляется только количество установок, никакие личные данные не собираются.  
