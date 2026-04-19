@@ -37,10 +37,16 @@ jobs:
           sed -i "s/SCRIPT_VERSION=\"[0-9.]*\"/SCRIPT_VERSION=\"${{ steps.new.outputs.version }}\"/" russian.sh
           sed -i "s/SCRIPT_DATE=\"[0-9-]*\"/SCRIPT_DATE=\"$(date +%Y-%m-%d)\"/" russian.sh
       
+      - name: Update script version badge in README
+        run: |
+          NEW_VERSION="${{ steps.new.outputs.version }}"
+          sed -i "s/script-[0-9.]*-brightgreen/script-${NEW_VERSION}-brightgreen/" README.md
+          echo "✅ Бейдж версии скрипта обновлён: ${NEW_VERSION}"
+      
       - name: Commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add russian.sh
+          git add russian.sh README.md
           git commit -m "🔖 Bump version to ${{ steps.new.outputs.version }} [skip ci]"
           git push
