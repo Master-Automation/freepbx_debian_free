@@ -797,10 +797,54 @@ fi
 # ========== НАСТРОЙКА FREEPBX ПОСЛЕ УСТАНОВКИ ==========
 setCurrentStep "=== ФИНАЛЬНАЯ НАСТРОЙКА FREEPBX ==="
 
-# 1. Добавляем fwconsole в PATH (если не добавился)
-if [ -f /var/lib/asterisk/bin/fwconsole ]; then
-    ln -sf /var/lib/asterisk/bin/fwconsole /usr/local/bin/fwconsole
-    message "✅ fwconsole добавлен в PATH"
+# 1. Добавляем fwconsole в PATH (расширенный поиск)
+message "🔧 Настройка путей и прав..."
+
+# Проверка и настройка fwconsole
+if command -v fwconsole &>/dev/null; then
+    message "   ✅ fwconsole уже доступен в PATH"
+else
+    message "   ⚠️ fwconsole не найден. Выполняется поиск..."
+    # Ищем в стандартных директориях
+    FW_CONSOLE_PATH=$(find /usr/sbin /var/lib/asterisk/bin /usr/local/bin -name "fwconsole" 2>/dev/null | head -n 1)
+    if [[ -n "$FW_CONSOLE_PATH" ]]; then
+        message "   ✅ fwconsole найден по пути: $FW_CONSOLE_PATH"
+        ln -sf "$FW_CONSOLE_PATH" /usr/local/bin/fwconsole
+        message "   ✅ Создана символическая ссылка в /usr/local/bin"
+    else
+        message "   ❌ fwconsole не найден. Попытка переустановки FreePBX..."
+        apt-get install --reinstall freepbx17
+        FW_CONSOLE_PATH=$(find /usr/sbin /var/lib/asterisk/bin /usr/local/bin -name "fwconsole" 2>/dev/null | head -n 1)
+        if [[ -n "$FW_CONSOLE_PATH" ]]; then
+            ln -sf "$FW_CONSOLE_PATH" /usr/local/bin/fwconsole
+            message "   ✅ fwconsole найден и добавлен в PATH"
+        else
+            message "   ❌ Не удалось найти fwconsole"
+        fi
+    fi
+fi
+
+# Проверка и настройка конфигурации Asterisk
+ASTERISK_CONF_DIR="/etc/asterisk"
+if [[ ! -d "$ASTERISK_CONF_DIR" ]]; then
+    message "   ⚠️ Директория $ASTERISK_CONF_DIR не найдена. Создаём..."
+    mkdir -p "$ASTERISK_CONF_DIR"
+    cat > "$ASTERISK_CONF_DIR/asterisk.conf" <<EOF
+[directories]
+astetcdir => /etc/asterisk
+astmoddir => /usr/lib64/asterisk/modules
+astvarlibdir => /var/lib/asterisk
+astdbdir => /var/lib/asterisk
+astkeydir => /var/lib/asterisk
+astdatadir => /var/lib/asterisk
+astagidir => /var/lib/asterisk/agi-bin
+astspooldir => /var/spool/asterisk
+astrundir => /var/run/asterisk
+astlogdir => /var/log/asterisk
+astsbindir => /usr/sbin
+EOF
+    message "   ✅ Базовая конфигурация Asterisk создана"
+    chown -R asterisk:asterisk /etc/asterisk
 fi
 
 # 2. Настраиваем базу данных
@@ -860,6 +904,13 @@ EOF
 
 # 5. Вызываем функцию проверки
 repair_freepbx
+
+# Проверяем, что fwconsole работает
+if command -v fwconsole &>/dev/null; then
+    message "✅ fwconsole готов к работе"
+else
+    message "⚠️ fwconsole не найден, проверьте установку FreePBX"
+fi
 
 # 6. Проверка модулей Asterisk
 check_asterisk_modules
