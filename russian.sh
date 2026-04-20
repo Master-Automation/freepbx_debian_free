@@ -820,8 +820,19 @@ else
     message "⚠️ Ошибка настройки базы данных"
 fi
 
-# 3. Обновляем /etc/freepbx.conf
-if [ -f /etc/freepbx.conf ]; then
+# 3. Создаём или обновляем /etc/freepbx.conf
+if [ ! -f /etc/freepbx.conf ]; then
+    cat > /etc/freepbx.conf <<EOF
+<?php
+\$amp_conf = array();
+\$amp_conf['AMPDBHOST'] = 'localhost';
+\$amp_conf['AMPDBUSER'] = 'freepbxuser';
+\$amp_conf['AMPDBPASS'] = '${DB_PASSWORD}';
+\$amp_conf['AMPDBNAME'] = 'asterisk';
+?>
+EOF
+    message "✅ /etc/freepbx.conf создан"
+else
     sed -i "s/\(\$amp_conf\['AMPDBPASS'\] = '\)[^']*';/\1${DB_PASSWORD}';/" /etc/freepbx.conf
     message "✅ /etc/freepbx.conf обновлён"
 fi
