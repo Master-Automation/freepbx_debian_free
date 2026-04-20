@@ -770,7 +770,6 @@ DB_PASSWORD=$(openssl rand -base64 16 | tr -d '=+/' | cut -c1-16)
 mysql -u root <<EOF
 CREATE DATABASE IF NOT EXISTS asterisk;
 CREATE USER IF NOT EXISTS 'freepbxuser'@'localhost' IDENTIFIED BY '${DB_PASSWORD}';
-ALTER USER 'freepbxuser'@'localhost' IDENTIFIED BY '${DB_PASSWORD}';
 GRANT ALL PRIVILEGES ON asterisk.* TO 'freepbxuser'@'localhost';
 FLUSH PRIVILEGES;
 EOF
@@ -787,13 +786,30 @@ if [ -f /etc/freepbx.conf ]; then
     message "✅ /etc/freepbx.conf обновлён"
 fi
 
-# 4. Перезапускаем FreePBX
-if command -v fwconsole > /dev/null 2>&1; then
-    fwconsole reload
-    message "✅ FreePBX перезагружен"
-else
-    message "⚠️ fwconsole не найден, проверьте установку"
-fi
+# 4. Функция проверки и восстановления
+repair_freepbx() {
+    message "🔍 Проверка работоспособности FreePBX..."
+    
+    if ! fwconsole ma list &>/dev/null; then
+        message "⚠️ Обнаружена проблема с подключением к базе данных. Выполняется автоматическое восстановление..."
+        
+        DB_PASS=$(grep "AMPDBPASS" /etc/freepbx.conf | cut -d"'" -f2)
+        
+        mysql -u root <<EOF
+ALTER USER 'freepbxuser'@'localhost' IDENTIFIED BY '${DB_PASS}';
+FLUSH PRIVILEGES;
+EOF
+        
+        fwconsole reload
+        message "✅ Соединение с базой данных восстановлено."
+    else
+        message "✅ FreePBX работает стабильно."
+    fi
+}
+
+# 5. Вызываем функцию проверки
+repair_freepbx
+
 message "✅ FreePBX финально настроен"
 # ====================================================
 
