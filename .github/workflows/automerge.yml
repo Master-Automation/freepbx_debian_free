@@ -10,7 +10,6 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-      
     steps:
       - name: Check if PR is from Dependabot
         id: dependabot
@@ -23,11 +22,11 @@ jobs:
               pull_number: context.issue.number
             });
             return pr.user.login === 'dependabot[bot]';
-            
+
       - name: Auto-merge Dependabot PRs
         if: steps.dependabot.outputs.result == 'true'
         run: |
           gh pr merge --auto --merge "$PR_URL"
         env:
-          PR_URL: ${{github.event.pull_request.html_url}}
+          PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
