@@ -51,6 +51,61 @@ fi
 
 export PATH=$SANE_PATH
 
+# Предварительная проверка условий перед установкой
+pre_install_check() {
+    message "🔍 Предварительная проверка системы..."
+    
+    local ALL_OK=true
+    
+    # 1. Проверка прав на запись в /usr/src
+    if [ ! -w /usr/src ]; then
+        message "   ❌ Нет прав на запись в /usr/src"
+        ALL_OK=false
+    else
+        message "   ✅ Права на запись в /usr/src"
+    fi
+    
+    # 2. Проверка свободного места (минимум 5 ГБ)
+    FREE_SPACE=$(df /usr/src | awk 'NR==2 {print $4}')
+    if [ $FREE_SPACE -lt 5242880 ]; then
+        message "   ❌ Недостаточно места на диске (нужно минимум 5 ГБ)"
+        ALL_OK=false
+    else
+        message "   ✅ Свободное место: $(($FREE_SPACE / 1024)) МБ"
+    fi
+    
+    # 3. Проверка интернета
+    if ! curl -s --connect-timeout 5 https://deb.debian.org > /dev/null 2>&1; then
+        message "   ❌ Нет доступа к интернету"
+        ALL_OK=false
+    else
+        message "   ✅ Интернет доступен"
+    fi
+    
+    # 4. Проверка DNS (github.com)
+    if ! ping -c 1 github.com > /dev/null 2>&1; then
+        message "   ⚠️ GitHub может быть недоступен (проверка ping не прошла)"
+    else
+        message "   ✅ GitHub доступен"
+    fi
+    
+    # 5. Проверка, что система не в chroot/контейнере (опционально)
+    if [ -f /.dockerenv ]; then
+        message "   ⚠️ Обнаружен Docker контейнер (некоторые функции могут не работать)"
+    fi
+    
+    if [ "$ALL_OK" = false ]; then
+        message ""
+        message "❌ Предварительная проверка не пройдена. Установка прервана."
+        message "   Устраните проблемы и запустите скрипт снова."
+        exit 1
+    fi
+    
+    message "   ✅ Все условия выполнены, продолжаем установку..."
+    message ""
+}
+
+
 # Проверка ранее выполненных этапов
 check_previous_install() {
     message "🔍 Проверка ранее установленных компонентов..."
