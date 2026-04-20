@@ -2,7 +2,7 @@
 #####################################################################################
 # Скрипт установки FreePBX 17 на Debian 12
 # Адаптирован под условия в России
-# Версия: 3.1.2
+# Версия: 3.1.7
 #####################################################################################
 set -e
 SCRIPT_VERSION="3.1.7"
@@ -432,6 +432,7 @@ install_asterisk() {
     
     message "✅ Asterisk ${astver} успешно собран и установлен."
 }
+
 # Проверка модулей Asterisk после установки
 check_asterisk_modules() {
     message "🔍 Проверка модулей Asterisk..."
@@ -472,6 +473,8 @@ install_freepbx() {
     message "Попытка 1/2: установка из репозитория Sangoma..."
     if apt-get install -y freepbx17 sangoma-pbx17 sysadmin17 2>&1 | tee -a "$log"; then
         message "   ✅ FreePBX успешно установлен из репозитория."
+        check_and_log "fwconsole в PATH" "command -v fwconsole"
+        check_and_log "Подключение к БД" "fwconsole ma list &>/dev/null"
         return 0
     else
         message "   ⚠️ Установка из репозитория не удалась."
@@ -670,6 +673,19 @@ mark_step() {
     message "   ✅ $step_num. $step_name — выполнено"
 }
 
+# Функция проверки и логирования
+check_and_log() {
+    local step=$1
+    local command=$2
+    if eval "$command" &>/dev/null; then
+        message "   ✅ $step — пройдено"
+        echo "$step: OK" >> /tmp/install_checkpoints.log
+    else
+        message "   ❌ $step — НЕ ПРОЙДЕНО"
+        echo "$step: FAIL" >> /tmp/install_checkpoints.log
+    fi
+}
+
 setCurrentStep "=== ПРОВЕРКА И ПОДГОТОВКА СИСТЕМЫ ==="
 apt-get -y --fix-broken install >> "$log"
 apt-get autoremove -y >> "$log"
@@ -798,6 +814,8 @@ EOF
 
 if [ $? -eq 0 ]; then
     message "✅ База данных asterisk создана и настроена"
+    check_and_log "MySQL сервер" "systemctl is-active mariadb"
+    check_and_log "Пользователь freepbxuser" "mysql -u root -e 'SELECT 1'"
 else
     message "⚠️ Ошибка настройки базы данных"
 fi
@@ -865,18 +883,6 @@ check_web_interface
 message "✅ FreePBX финально настроен"
 # ====================================================
 
-# Удаление коммерческих модулей (оставляем только нужные)
-if [ "$opensourceonly" ]; then
-    setCurrentStep "=== УДАЛЕНИЕ КОММЕРЧЕСКИХ МОДУЛЕЙ (оставляем sysadmin, firewall, customcontexts) ==="
-    keep_modules="sysadmin|firewall|customcontexts"
-    modules_to_remove=$(fwconsole ma list | awk '/Commercial/ {print $2}' | grep -vE "$keep_modules" || true)
-    if [ -n "$modules_to_remove" ]; then
-        echo "$modules_to_remove" | xargs -t -I {} fwconsole ma -f remove {} >> "$log" 2>&1
-        message "Ненужные коммерческие модули удалены. Модули Sysadmin, Firewall и Custom Contexts оставлены."
-    else
-        message "Коммерческие модули для удаления не найдены (или все уже удалены)."
-    fi
-fi
 # Удаление коммерческих модулей (оставляем только нужные)
 if [ "$opensourceonly" ]; then
     setCurrentStep "=== УДАЛЕНИЕ КОММЕРЧЕСКИХ МОДУЛЕЙ (оставляем sysadmin, firewall, customcontexts) ==="
