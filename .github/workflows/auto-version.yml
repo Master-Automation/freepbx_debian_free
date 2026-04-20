@@ -105,7 +105,7 @@ jobs:
           sed -i "s/-[0-9]\+\.[0-9]\+\.[0-9]\+-brightgreen/-$NEW_RUSSIAN-brightgreen/" README.md
           sed -i "s/-[0-9]\+\.[0-9]\+\.[0-9]\+-blue/-$NEW_DEBUG-blue/" README.md
           sed -i "s/-[0-9]\+\.[0-9]\+\.[0-9]\+-blue/-$NEW_REPORT-blue/" README.md
-          sed -i "s/version=[0-9.]\+/version=$NEW_RUSSIAN/" README.md
+          sed -i "s/version=[0-9]\+\.[0-9]\+\.[0-9]/version=$NEW_RUSSIAN/" README.md
 
       # ----------------- Commit and push -----------------
       - name: Commit and push
