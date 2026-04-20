@@ -481,6 +481,15 @@ install_freepbx() {
     message "Попытка 1/2: установка из репозитория Sangoma..."
     if apt-get install -y freepbx17 sangoma-pbx17 sysadmin17 2>&1 | tee -a "$log"; then
         message "   ✅ FreePBX успешно установлен из репозитория."
+        
+        # Устанавливаем зависимости Composer (нужны для работы fwconsole)
+        if [ -f /var/www/html/admin/composer.json ]; then
+            message "   📦 Установка зависимостей Composer..."
+            cd /var/www/html/admin
+            composer install --no-dev 2>&1 | tee -a "$log"
+            message "   ✅ Зависимости Composer установлены"
+        fi
+        
         check_and_log "fwconsole в PATH" "command -v fwconsole"
         check_and_log "Подключение к БД" "fwconsole ma list &>/dev/null"
         return 0
@@ -851,10 +860,16 @@ astrundir => /var/run/asterisk
 astlogdir => /var/log/asterisk
 astsbindir => /usr/sbin
 EOF
-    message "   ✅ Базовая конфигурация Asterisk создана"
-    chown -R asterisk:asterisk /etc/asterisk
-fi
 
+    chown -R asterisk:asterisk /etc/asterisk
+    
+    # Создаём все необходимые пустые конфиги
+    for conf in acl.conf adsi.conf aeap.conf agents.conf alarmreceiver.conf alsa.conf amd.conf app_skel.conf ari_additional.conf ari_general_additional.conf ast_debug_tools.conf asterisk.adsi calendar.conf ccss.conf cdr.conf.back cdr_adaptive_odbc.conf cdr_beanstalkd.conf cdr_general_additional.conf cdr_manager_general_additional.conf cdr_manager_mapping_additional.conf cdr_odbc.conf cdr_pgsql.conf cdr_tds.conf cdrpro_events cel_beanstalkd.conf cel_custom_post.conf cel_general_additional.conf cel_odbc.conf cel_pgsql.conf cel_tds.conf chan_dahdi.conf chan_dahdi_additional.conf chan_mobile.conf cli.conf cli_aliases.conf cli_permissions.conf codecs.conf confbridge_additional.conf config_test.conf console.conf dbsep.conf dnsmgr.conf dsp.conf dundi.conf enum.conf extconfig.conf extensions.ael extensions.lua extensions_additional.conf extensions_minivm.conf extensions_override_freepbx.conf features_applicationmap_additional.conf features_featuremap_additional.conf features_general_additional.conf festival.conf firewall followme.conf freepbx_module_admin.conf func_odbc.conf geolocation.conf hep.conf http_additional.conf iax_additional.conf iax_custom_post.conf iax_general_additional.conf iax_registrations.conf iaxprov.conf indications.conf indications_additional.conf indications_general_additional.conf localprefixes.conf logger_general_additional.conf logger_logfiles_additional.conf manager.conf manager.conf.bak manager_additional.conf meetme.conf meetme_additional.conf meetme_general_additional.conf mgcp.conf minivm.conf modules.conf motif.conf musiconhold.conf musiconhold_additional.conf ooh323.conf osp.conf phoneprov.conf phpagi.conf pjproject.conf pjsip.aor.conf pjsip.aor_custom_post.conf pjsip.auth.conf pjsip.auth_custom_post.conf pjsip.conf pjsip.endpoint.conf pjsip.endpoint_custom_post.conf pjsip.identify.conf pjsip.identify_custom_post.conf pjsip.registration.conf pjsip.registration_custom_post.conf pjsip.transports.conf pjsip.transports_custom_post.conf pjsip_custom_post.conf pjsip_notify.conf pjsip_wizard.conf privacy.conf prometheus.conf queuerules_additional.conf queues.conf queues_additional.conf queues_custom_general.conf queues_general_additional.conf res_config_mysql.conf res_config_odbc.conf res_config_sqlite3.conf res_corosync.conf res_curl.conf res_digium_phone.conf res_digium_phone_general.conf res_fax.conf res_http_media_cache.conf res_ldap.conf res_odbc_additional.conf res_parking.conf res_parking_additional.conf res_pgsql.conf res_pktccops.conf res_snmp.conf res_stun_monitor.conf resolver_unbound.conf rtp_additional.conf sangomartapi-event-timeout.conf sangomartapi-logger.conf sangomartapi_conference say.conf sip_additional.conf sip_custom_post.conf sip_general_additional.conf sip_nat.conf sip_notify_additional.conf sip_registrations.conf skinny.conf sla.conf smdi.conf sorcery.conf srtapi_amidefault srtapi_aststate srtapi_browserphone srtapi_queue_events srtapi_realtime ss7.timers stasis.conf statsd.conf stir_shaken.conf telcordia-1.adsi test_sorcery.conf ucc_restrict.conf unistim.conf users.conf voicemail.conf voicemail.conf.template websocket_client.conf xmpp.conf; do
+        [ ! -f "/etc/asterisk/$conf" ] && touch "/etc/asterisk/$conf"
+    done
+    
+    message "   ✅ Базовая конфигурация Asterisk создана"
+fi
 # 2. Настраиваем базу данных
 DB_PASSWORD=$(openssl rand -base64 16 | tr -d '=+/' | cut -c1-16)
 mysql -u root <<EOF
