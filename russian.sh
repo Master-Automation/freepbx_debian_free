@@ -2,7 +2,7 @@
 #####################################################################################
 # Скрипт установки FreePBX 17 на Debian 12
 # Адаптирован под условия в России
-# Версия: 3.1.7
+# Версия: 3.1.9
 #####################################################################################
 set -e
 SCRIPT_VERSION="3.1.9"
@@ -84,13 +84,21 @@ else
     message "   ⬜ Asterisk не установлен"
 fi
     
-    # Проверка FreePBX
-    if command -v fwconsole > /dev/null 2>&1; then
-        message "   ✅ FreePBX уже установлен"
+    # Проверка FreePBX (надёжная)
+if command -v fwconsole > /dev/null 2>&1; then
+    # Дополнительная проверка: может ли fwconsole подключиться к БД
+    if fwconsole ma list &>/dev/null 2>&1; then
+        message "   ✅ FreePBX уже установлен и работает"
         NEED_FREEPBX=1
     else
-        message "   ⬜ FreePBX не установлен"
+        message "   ⚠️ FreePBX установлен, но не работает (проблема с БД)"
+        message "   🔄 Будет выполнена переустановка"
+        NEED_FREEPBX=0
     fi
+else
+    message "   ⬜ FreePBX не установлен"
+    NEED_FREEPBX=0
+fi
     
     # Пропускаем установку Asterisk если уже есть
     if [ $NEED_ASTERISK -eq 1 ]; then
@@ -941,6 +949,40 @@ check_web_interface() {
 
 # Вызываем проверку веб-интерфейса
 check_web_interface
+
+# ========== НАСТРОЙКА ПРАВ ДОСТУПА ==========
+setCurrentStep "=== НАСТРОЙКА ПРАВ ДОСТУПА ==="
+
+message "🔧 Настройка прав доступа..."
+
+# 1. Права Asterisk
+chown -R asterisk:asterisk /etc/asterisk 2>/dev/null || true
+chown -R asterisk:asterisk /var/lib/asterisk 2>/dev/null || true
+chown -R asterisk:asterisk /var/spool/asterisk 2>/dev/null || true
+chown -R asterisk:asterisk /var/log/asterisk 2>/dev/null || true
+chown asterisk:asterisk /var/run/asterisk 2>/dev/null || true
+message "   ✅ Права Asterisk настроены"
+
+# 2. Права FreePBX
+chown -R asterisk:asterisk /var/www/html/admin 2>/dev/null || true
+chown -R asterisk:asterisk /var/www/html/panel 2>/dev/null || true
+chown -R asterisk:asterisk /var/log/pbx 2>/dev/null || true
+chmod +x /var/lib/asterisk/bin/fwconsole 2>/dev/null || true
+message "   ✅ Права FreePBX настроены"
+
+# 3. Права Apache
+usermod -a -G asterisk www-data 2>/dev/null || true
+chown -R www-data:www-data /var/lib/php/session 2>/dev/null || true
+message "   ✅ Права Apache настроены"
+
+# 4. Специальные права
+chmod 775 /var/lib/asterisk/sounds 2>/dev/null || true
+chmod 775 /var/spool/asterisk/monitor 2>/dev/null || true
+chmod 775 /var/spool/asterisk/voicemail 2>/dev/null || true
+message "   ✅ Специальные права настроены"
+
+message "✅ Настройка прав доступа завершена"
+# ============================================
 
 message "✅ FreePBX финально настроен"
 # ====================================================
