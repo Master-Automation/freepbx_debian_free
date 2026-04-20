@@ -5,7 +5,7 @@
 # Версия: 3.1.9
 #####################################################################################
 set -e
-SCRIPT_VERSION="3.1.10"
+SCRIPT_VERSION="3.1.11"
 ASTVERSION=${ASTVERSION:-22}
 PHPVERSION="8.2"
 LOG_FOLDER="/var/log/pbx"
