@@ -1,15 +1,21 @@
-# Логи
+# Логи (только в корне репозитория и в подпапках)
 *.log
-/var/log/pbx/
+logs/
 
 # Временные файлы
 *.tmp
 *.bak
 
-# Файлы установки
-russian.sh
+# Файлы установки (временные)
 version.hash.tmp
+russian.sh.bak
+debug.sh.bak
+report.sh.bak
 
 # IDE
 .vscode/
 .idea/
+
+# Отчёты (если вы сохраняете их в папку reports/)
+reports/
+*.report.txt
