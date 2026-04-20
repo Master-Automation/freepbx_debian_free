@@ -84,13 +84,13 @@ bash <(curl -sL https://raw.githubusercontent.com/Master-Automation/freepbx_debi
 
 ## 📋 Что будет установлено (основные компоненты)
 
-Базовые пакеты FreePBX (через APT)
+Базовые пакеты FreePBX (через APT):
 
-sysadmin17 – системное администрирование (бесплатная базовая часть)  
-**sangoma-pbx17** – основной пакет FreePBX  
-**freepbx17** – ядро FreePBX  
-**ffmpeg** – обработка медиа  
-**ioncube-loader-82** – для зашифрованных модулей  
+- **sysadmin17** – системное администрирование (бесплатная базовая часть)  
+- **sangoma-pbx17** – основной пакет FreePBX  
+- **freepbx17** – ядро FreePBX  
+- **ffmpeg** – обработка медиа  
+- **ioncube-loader-82** – для зашифрованных модулей  
 
 Открытые модули (остаются включёнными):
 
