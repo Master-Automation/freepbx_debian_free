@@ -8,7 +8,7 @@
 # =============================================================================
 
 set -e
-SCRIPT_VERSION="3.2.1"
+SCRIPT_VERSION="3.2.2"
 ASTVERSION=${ASTVERSION:-22}
 PHPVERSION="8.2"
 LOG_FOLDER="/var/log/pbx"
