@@ -1,3 +1,1 @@
-sha256sum russian.sh | awk '{print $1}' > version.hash
-sha256sum debug.sh | awk '{print $1}' > debug.hash
-sha256sum report.sh | awk '{print $1}' > report.hash
+ee9bfc5cd6909740fdc27c4596714d2ce67c086843c49bf8451bc0142e462cee
