@@ -486,8 +486,19 @@ install_freepbx() {
         if [ -f /var/www/html/admin/composer.json ]; then
             message "   📦 Установка зависимостей Composer..."
             cd /var/www/html/admin
+            
+            # Пересоздаём autoloader (на случай если он сломан)
             composer install --no-dev 2>&1 | tee -a "$log"
-            message "   ✅ Зависимости Composer установлены"
+            message "   🔄 Пересоздание autoloader..."
+            composer dump-autoload 2>&1 | tee -a "$log"
+            
+            # Проверяем, что класс Symfony существует
+            if ! grep -q "Symfony\\\\Component\\\\Console\\\\Application" vendor/autoload.php 2>/dev/null; then
+                message "   ⚠️ Autoloader повреждён, принудительное восстановление..."
+                rm -rf vendor composer.lock
+                composer install --no-dev 2>&1 | tee -a "$log"
+            fi
+            message "   ✅ Зависимости Composer и autoloader настроены"
         fi
         
         check_and_log "fwconsole в PATH" "command -v fwconsole"
