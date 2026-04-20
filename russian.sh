@@ -432,6 +432,28 @@ install_asterisk() {
     
     message "✅ Asterisk ${astver} успешно собран и установлен."
 }
+# Проверка модулей Asterisk после установки
+check_asterisk_modules() {
+    message "🔍 Проверка модулей Asterisk..."
+    
+    # Проверяем, что модули загружаются
+    if sudo asterisk -rx "module show" 2>/dev/null | grep -q "res_pjsip"; then
+        message "   ✅ Модули Asterisk загружены корректно"
+        return 0
+    else
+        message "   ⚠️ Модули Asterisk не загружены, переустанавливаем..."
+        cd /usr/src/asterisk-${ASTVERSION}
+        sudo make install
+        sudo ldconfig
+        sudo systemctl restart asterisk
+        if sudo asterisk -rx "module show" 2>/dev/null | grep -q "res_pjsip"; then
+            message "   ✅ Модули успешно восстановлены"
+        else
+            message "   ❌ Не удалось восстановить модули Asterisk"
+            return 1
+        fi
+    fi
+}
 
 # Установка FreePBX (с fallback из исходников)
 install_freepbx() {
@@ -809,6 +831,36 @@ EOF
 
 # 5. Вызываем функцию проверки
 repair_freepbx
+
+# 6. Проверка модулей Asterisk
+check_asterisk_modules
+
+# 7. Проверка веб-интерфейса FreePBX
+check_web_interface() {
+    message "🔍 Проверка веб-интерфейса FreePBX..."
+    
+    SERVER_IP=$(hostname -I | awk '{print $1}')
+    
+    # Проверяем, что веб-сервер отвечает
+    if curl -s -o /dev/null -w "%{http_code}" http://localhost/ | grep -q "200\|302"; then
+        message "   ✅ Веб-сервер Apache отвечает"
+    else
+        message "   ⚠️ Веб-сервер не отвечает, перезапускаем Apache..."
+        sudo systemctl restart apache2
+    fi
+    
+    # Проверяем, что FreePBX отвечает
+    if curl -s -L http://localhost/admin | grep -qi "freepbx\|login"; then
+        message "   ✅ FreePBX веб-интерфейс доступен"
+        message "   🌐 Веб-интерфейс: http://${SERVER_IP}"
+    else
+        message "   ⚠️ FreePBX веб-интерфейс не отвечает"
+        message "   🌐 Попробуйте открыть: http://${SERVER_IP}"
+    fi
+}
+
+# Вызываем проверку веб-интерфейса
+check_web_interface
 
 message "✅ FreePBX финально настроен"
 # ====================================================
