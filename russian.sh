@@ -768,11 +768,18 @@ fi
 # 2. Настраиваем базу данных
 DB_PASSWORD=$(openssl rand -base64 16 | tr -d '=+/' | cut -c1-16)
 mysql -u root <<EOF
+CREATE DATABASE IF NOT EXISTS asterisk;
 CREATE USER IF NOT EXISTS 'freepbxuser'@'localhost' IDENTIFIED BY '${DB_PASSWORD}';
 ALTER USER 'freepbxuser'@'localhost' IDENTIFIED BY '${DB_PASSWORD}';
 GRANT ALL PRIVILEGES ON asterisk.* TO 'freepbxuser'@'localhost';
 FLUSH PRIVILEGES;
 EOF
+
+if [ $? -eq 0 ]; then
+    message "✅ База данных asterisk создана и настроена"
+else
+    message "⚠️ Ошибка настройки базы данных"
+fi
 
 # 3. Обновляем /etc/freepbx.conf
 if [ -f /etc/freepbx.conf ]; then
