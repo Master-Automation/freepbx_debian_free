@@ -16,9 +16,9 @@ Your Open Source Asterisk PBX GUI Solution
 |----------|----------|
 | **📅 Обновлено** | ![Last Commit](https://img.shields.io/github/last-commit/Master-Automation/freepbx_debian_free?label=) |
 | **🏷️ Свежий релиз** | [![](https://img.shields.io/github/v/release/Master-Automation/freepbx_debian_free?label=%20&color=blue)](https://github.com/Master-Automation/freepbx_debian_free/releases) |
-| **🔧 Установщик** | [![Installer](https://img.shields.io/badge/-3.2.4-brightgreen)](https://github.com/Master-Automation/freepbx_debian_free/blob/master/russian.sh) |
-| **🛠️ Отладчик** | [![Debug](https://img.shields.io/badge/-1.0.3-blue)](https://github.com/Master-Automation/freepbx_debian_free/blob/master/debug.sh) |
-| **📝 Отчёт** | [![Report](https://img.shields.io/badge/-1.0.3-blue)](https://github.com/Master-Automation/freepbx_debian_free/blob/master/report.sh) |
+| **🔧 Установщик** | [![Installer](https://img.shields.io/badge/-3.2.5-brightgreen)](https://github.com/Master-Automation/freepbx_debian_free/blob/master/russian.sh) |
+| **🛠️ Отладчик** | [![Debug](https://img.shields.io/badge/-1.0.4-blue)](https://github.com/Master-Automation/freepbx_debian_free/blob/master/debug.sh) |
+| **📝 Отчёт** | [![Report](https://img.shields.io/badge/-1.0.4-blue)](https://github.com/Master-Automation/freepbx_debian_free/blob/master/report.sh) |
 | **✅ Статус сборки** | [![CI](https://github.com/Master-Automation/freepbx_debian_free/actions/workflows/auto-version.yml/badge.svg)](https://github.com/Master-Automation/freepbx_debian_free/actions/workflows/auto-version.yml) |
 | **📊 Успешных установок версии 3.2.0** | [![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2FMaster-Automation%2Ffreepbx_debian_free%2Frussian.sh%3Fversion%3D3.2.0&title=%20&edge_flat=false)](https://hits.seeyoufarm.com) |
 | **📈 Всего установок** | [![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2FMaster-Automation%2Ffreepbx_debian_free%2Frussian.sh&title=%20&edge_flat=false)](https://hits.seeyoufarm.com) |
