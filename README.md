@@ -201,8 +201,8 @@ bash <(curl -sL https://raw.githubusercontent.com/Master-Automation/freepbx_debi
 Данная модификация распространяется на тех же условиях.
 
 ## 🙏 Благодарности
-Официальный скрипт FreePBX: sng_freepbx_debian_install
-Скрипт IN1CLICK от 20tele.com (идеи обхода проблем с репозиториями).
+Официальный скрипт FreePBX: sng_freepbx_debian_install  
+Скрипт IN1CLICK от 20tele.com (идеи обхода проблем с репозиториями).  
 Сообщество FreePBX и пользователи, сообщившие об ошибках.
 
 
