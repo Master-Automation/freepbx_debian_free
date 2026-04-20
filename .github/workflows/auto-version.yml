@@ -95,18 +95,22 @@ jobs:
         run: |
           sha256sum report.sh | awk '{print $1}' > report.hash
 
-      # ----------------- Update README badges -----------------
+           # ----------------- Update README badges -----------------
       - name: Update README badges
         run: |
           NEW_RUSSIAN="${{ steps.new_russian.outputs.version }}"
           NEW_DEBUG="${{ steps.new_debug.outputs.version }}"
           NEW_REPORT="${{ steps.new_report.outputs.version }}"
-          # Обновляем бейджи (формат: -X.X.X-brightgreen или -X.X.X-blue)
+
+          # Бейджи версий
           sed -i "s/-[0-9]\+\.[0-9]\+\.[0-9]\+-brightgreen/-$NEW_RUSSIAN-brightgreen/" README.md
           sed -i "s/-[0-9]\+\.[0-9]\+\.[0-9]\+-blue/-$NEW_DEBUG-blue/" README.md
           sed -i "s/-[0-9]\+\.[0-9]\+\.[0-9]\+-blue/-$NEW_REPORT-blue/" README.md
-          sed -i "s/version=[0-9]\+\.[0-9]\+\.[0-9]/version=$NEW_RUSSIAN/" README.md
 
+          # Счётчик установок (текст и URL)
+          sed -i "s/версии [0-9.]\+/версии $NEW_RUSSIAN/" README.md
+          sed -i "s/version=[0-9.]\+/version=$NEW_RUSSIAN/" README.md
+ 
       # ----------------- Commit and push -----------------
       - name: Commit and push
         run: |
