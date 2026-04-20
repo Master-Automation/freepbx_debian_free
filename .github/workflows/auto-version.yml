@@ -21,13 +21,13 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Get current version (russian)
+      - name: Get current russian
         id: ver_russian
         run: |
           VERSION=$(grep 'SCRIPT_VERSION="' russian.sh | head -1 | cut -d'"' -f2)
           echo "current=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Increment patch version (russian)
+      - name: Increment patch russian
         id: new_russian
         run: |
           CURRENT="${{ steps.ver_russian.outputs.current }}"
