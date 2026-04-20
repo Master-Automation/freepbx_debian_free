@@ -21,7 +21,7 @@ echo ""
 
 # URL скрипта и хеша
 SCRIPT_URL="https://raw.githubusercontent.com/Master-Automation/freepbx_debian_free/master/russian.sh"
-HASH_URL="https://raw.githubusercontent.com/Master-Automation/freepbx_debian_free/master/version.hash"
+HASH_URL="https://raw.githubusercontent.com/Master-Automation/freepbx_debian_free/master/russian.hash"
 
 # Шаг 1: Скачивание скрипта
 echo -e "${BLUE}📥 Шаг 1/4: Скачивание скрипта...${NC}"
