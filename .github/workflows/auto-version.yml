@@ -77,7 +77,7 @@ jobs:
       # Обновление хешей
       - name: Update hash files
         run: |
-          sha256sum russian.sh | awk '{print $1}' > version.hash
+          sha256sum russian.sh | awk '{print $1}' > russian.hash
           sha256sum debug.sh | awk '{print $1}' > debug.hash
           sha256sum report.sh | awk '{print $1}' > report.hash
 
@@ -85,6 +85,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add russian.sh debug.sh report.sh version.hash debug.hash report.hash
+          git add russian.sh debug.sh report.sh russian.hash debug.hash report.hash
           git diff --cached --quiet || git commit -m "🔖 Bump versions: russian ${{ steps.new_russian.outputs.version }}, debug ${{ steps.new_debug.outputs.version }}, report ${{ steps.new_report.outputs.version }} [skip ci]"
           git push
