@@ -24,7 +24,7 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      # ----------------- 1. install.sh (main) -----------------
+      # --- 1. install.sh ---
       - name: Process install.sh
         id: proc_install
         run: |
@@ -35,7 +35,7 @@ jobs:
           sha256sum scripts/main/install.sh | awk '{print $1}' > hash/install.hash
           echo "version=$NEW_VER" >> $GITHUB_OUTPUT
 
-      # ----------------- 2. russian.sh (main) -----------------
+      # --- 2. russian.sh ---
       - name: Process russian.sh
         id: proc_russian
         run: |
@@ -46,7 +46,7 @@ jobs:
           sha256sum scripts/main/russian.sh | awk '{print $1}' > hash/russian.hash
           echo "version=$NEW_VER" >> $GITHUB_OUTPUT
 
-      # ----------------- 3. debug.sh (utils) -----------------
+      # --- 3. debug.sh ---
       - name: Process debug.sh
         id: proc_debug
         run: |
@@ -57,7 +57,7 @@ jobs:
           sha256sum scripts/utils/debug.sh | awk '{print $1}' > hash/debug.hash
           echo "version=$NEW_VER" >> $GITHUB_OUTPUT
 
-      # ----------------- 4. report.sh (utils) -----------------
+      # --- 4. report.sh ---
       - name: Process report.sh
         id: proc_report
         run: |
@@ -68,8 +68,8 @@ jobs:
           sha256sum scripts/utils/report.sh | awk '{print $1}' > hash/report.hash
           echo "version=$NEW_VER" >> $GITHUB_OUTPUT
 
-      # ----------------- 5. system-pre-check.sh (utils) -----------------
-      - name: Process system-pre-check.sh
+      # --- 5. system-pre-check.sh ---
+      - name: Process pre-check
         id: proc_check
         run: |
           VERSION=$(grep 'VERSION="' scripts/utils/system-pre-check.sh | head -1 | cut -d'"' -f2)
@@ -79,40 +79,35 @@ jobs:
           sha256sum scripts/utils/system-pre-check.sh | awk '{print $1}' > hash/system-pre-check.hash
           echo "version=$NEW_VER" >> $GITHUB_OUTPUT
 
-      # ----------------- Update README badges -----------------
-        
-      - name: Update README badges
+      # ----------------- Update README -----------------
+      - name: Update README
         run: |
-          V_INSTALL="${{ steps.proc_install.outputs.version }}"
-          V_RUSSIAN="${{ steps.proc_russian.outputs.version }}"
-          V_DEBUG="${{ steps.proc_debug.outputs.version }}"
-          V_REPORT="${{ steps.proc_report.outputs.version }}"
-          V_CHECK="${{ steps.proc_check.outputs.version }}"
-
-          # Путь к файлу
           README="docs/README.md"
+          VER_RUSSIAN="${{ steps.proc_russian.outputs.version }}"
+          VER_INSTALL="${{ steps.proc_install.outputs.version }}"
+          VER_DEBUG="${{ steps.proc_debug.outputs.version }}"
+          VER_REPORT="${{ steps.proc_report.outputs.version }}"
+          VER_CHECK="${{ steps.proc_check.outputs.version }}"
 
-          # 1. Обновляем бейджи в таблице (ищем по названию и меняем версию рядом)
-          sed -i "s/\(Installer.*badge\/-\)[0-9.]\+/\1$V_INSTALL/g" $README
-          sed -i "s/\(Installer.*badge\/-\)[0-9.]\+/\1$V_RUSSIAN/g" $README # Для второй строки в таблице
-          sed -i "s/\(Debug.*badge\/-\)[0-9.]\+/\1$V_DEBUG/g" $README
-          sed -i "s/\(Report.*badge\/-\)[0-9.]\+/\1$V_REPORT/g" $README
-          
-          # Если добавите строку для Pre-Check:
-          sed -i "s/\(Pre--Check.*badge\/-\)[0-9.]\+/\1$V_CHECK/g" $README
+          # Обновление бейджей в таблице (по ключевым словам)
+          sed -i "/Установщик/s/badge\/-[0-9.]\+-brightgreen/badge\/-$VER_INSTALL-brightgreen/" $README
+          sed -i "/Russian/s/badge\/-[0-9.]\+-brightgreen/badge\/-$VER_RUSSIAN-brightgreen/" $README
+          sed -i "/Отладчик/s/badge\/-[0-9.]\+-blue/badge\/-$VER_DEBUG-blue/" $README
+          sed -i "/Отчёт/s/badge\/-[0-9.]\+-blue/badge\/-$VER_REPORT-blue/" $README
+          sed -i "/Предпроверка/s/badge\/-[0-9.]\+-blue/badge\/-$VER_CHECK-blue/" $README
 
-          # 2. Обновляем версию в тексте и ссылках (счетчик Hits)
-          sed -i "s/версии [0-9.]\+/версии $V_RUSSIAN/g" $README
-          sed -i "s/version%3D[0-9.]\+/version%3D$V_RUSSIAN/g" $README
+          # Обновление счетчика версии (Hits в таблице)
+          # Меняем и текст бейджа в строке, и параметр version= в ссылке
+          sed -i "/Успешных установок/s/badge\/-[0-9.]\+-brightgreen/badge\/-$VER_RUSSIAN-brightgreen/g" $README
+          sed -i "s/version%3D[0-9.]\+/version%3D$VER_RUSSIAN/g" $README
 
- 
       # ----------------- Commit and push -----------------
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@://github.com"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           git add scripts/main/*.sh scripts/utils/*.sh hash/*.hash docs/README.md
           git diff --cached --quiet && echo "No changes to commit" && exit 0
-          git commit -m "🔖 Bump versions and update hashes [skip ci]"
+          git commit -m "🔖 Bump versions & update README table [skip ci]"
           git pull --rebase origin master
           git push origin master
