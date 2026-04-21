@@ -12,17 +12,21 @@ Your Open Source Asterisk PBX GUI Solution
 
 ## 📊 Информация о проекте
 
+
 | Параметр | Значение |
 |----------|----------|
-| **📅 Обновлено** | ![Last Commit](https://img.shields.io/github/last-commit/Master-Automation/freepbx_debian_free?label=) |
-| **🏷️ Свежий релиз** | [![](https://img.shields.io/github/v/release/Master-Automation/freepbx_debian_free?label=%20&color=blue)](https://github.com/Master-Automation/freepbx_debian_free/releases) |
-| **🔧 Установщик** | [![Installer](https://img.shields.io/badge/-3.2.5-brightgreen)](https://github.com/Master-Automation/freepbx_debian_free/blob/master/russian.sh) |
-| **🛠️ Отладчик** | [![Debug](https://img.shields.io/badge/-1.0.4-blue)](https://github.com/Master-Automation/freepbx_debian_free/blob/master/debug.sh) |
-| **📝 Отчёт** | [![Report](https://img.shields.io/badge/-1.0.4-blue)](https://github.com/Master-Automation/freepbx_debian_free/blob/master/report.sh) |
-| **✅ Статус сборки** | [![CI](https://github.com/Master-Automation/freepbx_debian_free/actions/workflows/auto-version.yml/badge.svg)](https://github.com/Master-Automation/freepbx_debian_free/actions/workflows/auto-version.yml) |
-| **📊 Успешных установок версии** [![Installer](https://img.shields.io/badge/-3.2.5-brightgreen)](https://github.com/Master-Automation/freepbx_debian_free/blob/master/russian.sh)  | [![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2FMaster-Automation%2Ffreepbx_debian_free%2Frussian.sh%3Fversion%3D3.2.0&title=%20&edge_flat=false)](https://hits.seeyoufarm.com) |
-| **📈 Всего установок** | [![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2FMaster-Automation%2Ffreepbx_debian_free%2Frussian.sh&title=%20&edge_flat=false)](https://hits.seeyoufarm.com) |
+| **📅 Обновлено** | ![Last Commit](https://img.shields.io/github/last-commit/Master-Automation/FreePBX?label=) |
+| **🏷️ Свежий релиз** | [![](https://img.shields.io/github/v/release/Master-Automation/FreePBX?label=%20&color=blue)](https://github.com) |
+| **🔧 Установщик** | [![Installer](https://shields.io)](https://github.com) |
+| **Russian скрипт** | [![Russian](https://img.shields.io/badge/-3.2.5-brightgreen)](https://github.com) |
+| **🛠️ Отладчик** | [![Debug](https://img.shields.io/badge/-1.0.4-blue)](https://github.com) |
+| **📝 Отчёт** | [![Report](https://img.shields.io/badge/-1.0.4-blue)](https://github.com) |
+| **✅ Предпроверка** | [![PreCheck](https://shields.io)](https://github.com) |
+| **✅ Статус сборки** | [![CI](https://github.com)](https://github.com) |
+| **📊 Успешных установок версии** [![Installer](https://img.shields.io/badge/-3.2.5-brightgreen)](https://github.com)  | [![Hits](https://seeyoufarm.com)](https://hits.seeyoufarm.com) |
+| **📈 Всего установок** | [![Hits](https://seeyoufarm.com)](https://hits.seeyoufarm.com) |
 | **📜 Лицензия** | [![License](https://img.shields.io/badge/-GPLv3-red)](LICENSE) |
+
 
 </br>
 
