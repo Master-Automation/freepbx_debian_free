@@ -3,7 +3,7 @@ name: Auto-update README hash and version
 on:
   push:
     paths:
-      - 'russian.sh'
+      - 'scripts/russian.sh' # Путь к скрипту в новой папке
     branches:
       - master
       - main
@@ -17,27 +17,32 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4 # Рекомендую v4, v6 пока нет
         with:
           fetch-depth: 0
       
       - name: Calculate hash
         id: hash
         run: |
-          HASH=$(sha256sum russian.sh | awk '{print $1}')
+          # Считаем хеш файла внутри папки scripts/
+          HASH=$(sha256sum scripts/russian.sh | awk '{print $1}')
           echo "hash=$HASH" >> $GITHUB_OUTPUT
           echo "✅ Хеш: $HASH"
       
       - name: Update version.hash file
         run: |
-          echo "${{ steps.hash.outputs.hash }}" > version.hash
-          echo "✅ version.hash обновлён"
+          # Сохраняем хеш в папку hash/
+          echo "${{ steps.hash.outputs.hash }}" > hash/version.hash
+          echo "✅ hash/version.hash обновлён"
       
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add version.hash
+          
+          # Добавляем файл из папки hash/
+          git add hash/version.hash
+          
           if git diff --cached --quiet; then
             echo "ℹ️ Нет изменений для коммита"
           else
