@@ -80,18 +80,31 @@ jobs:
           echo "version=$NEW_VER" >> $GITHUB_OUTPUT
 
       # ----------------- Update README badges -----------------
+        
       - name: Update README badges
         run: |
-          # Обновление всех бейджей версий
-          sed -i "s/-install-[0-9.]\+/-install-${{ steps.proc_install.outputs.version }}/g" docs/README.md
-          sed -i "s/-russian-[0-9.]\+/-russian-${{ steps.proc_russian.outputs.version }}/g" docs/README.md
-          sed -i "s/-debug-[0-9.]\+/-debug-${{ steps.proc_debug.outputs.version }}/g" docs/README.md
-          sed -i "s/-report-[0-9.]\+/-report-${{ steps.proc_report.outputs.version }}/g" docs/README.md
-          sed -i "s/-pre--check-[0-9.]\+/-pre--check-${{ steps.proc_check.outputs.version }}/g" docs/README.md
+          V_INSTALL="${{ steps.proc_install.outputs.version }}"
+          V_RUSSIAN="${{ steps.proc_russian.outputs.version }}"
+          V_DEBUG="${{ steps.proc_debug.outputs.version }}"
+          V_REPORT="${{ steps.proc_report.outputs.version }}"
+          V_CHECK="${{ steps.proc_check.outputs.version }}"
+
+          # Путь к файлу
+          README="docs/README.md"
+
+          # 1. Обновляем бейджи в таблице (ищем по названию и меняем версию рядом)
+          sed -i "s/\(Installer.*badge\/-\)[0-9.]\+/\1$V_INSTALL/g" $README
+          sed -i "s/\(Installer.*badge\/-\)[0-9.]\+/\1$V_RUSSIAN/g" $README # Для второй строки в таблице
+          sed -i "s/\(Debug.*badge\/-\)[0-9.]\+/\1$V_DEBUG/g" $README
+          sed -i "s/\(Report.*badge\/-\)[0-9.]\+/\1$V_REPORT/g" $README
           
-          # Счётчик и общая версия (завязано на russian)
-          sed -i "s/версии [0-9.]\+/версии ${{ steps.proc_russian.outputs.version }}/g" docs/README.md
-          sed -i "s/version=[0-9.]\+/version=${{ steps.proc_russian.outputs.version }}/g" docs/README.md
+          # Если добавите строку для Pre-Check:
+          sed -i "s/\(Pre--Check.*badge\/-\)[0-9.]\+/\1$V_CHECK/g" $README
+
+          # 2. Обновляем версию в тексте и ссылках (счетчик Hits)
+          sed -i "s/версии [0-9.]\+/версии $V_RUSSIAN/g" $README
+          sed -i "s/version%3D[0-9.]\+/version%3D$V_RUSSIAN/g" $README
+
  
       # ----------------- Commit and push -----------------
       - name: Commit and push
