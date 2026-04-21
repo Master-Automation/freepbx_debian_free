@@ -1,52 +1,123 @@
-name: Auto-update README hash and version
+name: Auto-version
 
 on:
   push:
     paths:
-      - 'scripts/russian.sh' # Путь к скрипту в новой папке
+      - 'scripts/main/russian.sh'
+      - 'scripts/main/debug.sh'
+      - 'scripts/main/report.sh'
     branches:
       - master
-      - main
   workflow_dispatch:
 
 jobs:
-  update:
+  update-version:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4 # Рекомендую v4, v6 пока нет
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
-      - name: Calculate hash
-        id: hash
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ----------------- russian.sh -----------------
+      - name: Get current russian
+        id: ver_russian
         run: |
-          # Считаем хеш файла внутри папки scripts/
-          HASH=$(sha256sum scripts/russian.sh | awk '{print $1}')
-          echo "hash=$HASH" >> $GITHUB_OUTPUT
-          echo "✅ Хеш: $HASH"
-      
-      - name: Update version.hash file
+          VERSION=$(grep 'SCRIPT_VERSION="' scripts/main/russian.sh | head -1 | cut -d'"' -f2)
+          echo "current=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Increment patch russian
+        id: new_russian
         run: |
-          # Сохраняем хеш в папку hash/
-          echo "${{ steps.hash.outputs.hash }}" > hash/version.hash
-          echo "✅ hash/version.hash обновлён"
-      
+          CURRENT="${{ steps.ver_russian.outputs.current }}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          PATCH=$((PATCH + 1))
+          NEW="$MAJOR.$MINOR.$PATCH"
+          echo "version=$NEW" >> $GITHUB_OUTPUT
+
+      - name: Update russian.sh version
+        run: |
+          sed -i "s/SCRIPT_VERSION=\"[0-9.]*\"/SCRIPT_VERSION=\"${{ steps.new_russian.outputs.version }}\"/" scripts/main/russian.sh
+
+      - name: Update russian.hash
+        run: |
+          sha256sum scripts/main/russian.sh | awk '{print $1}' > hash/russian.hash
+
+      # ----------------- debug.sh -----------------
+      - name: Get current debug
+        id: ver_debug
+        run: |
+          VERSION=$(grep 'VERSION="' scripts/main/debug.sh | head -1 | cut -d'"' -f2)
+          echo "current=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Increment patch debug
+        id: new_debug
+        run: |
+          CURRENT="${{ steps.ver_debug.outputs.current }}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          PATCH=$((PATCH + 1))
+          NEW="$MAJOR.$MINOR.$PATCH"
+          echo "version=$NEW" >> $GITHUB_OUTPUT
+
+      - name: Update debug.sh version
+        run: |
+          sed -i "s/VERSION=\"[0-9.]*\"/VERSION=\"${{ steps.new_debug.outputs.version }}\"/" scripts/main/debug.sh
+
+      - name: Update debug.hash
+        run: |
+          sha256sum scripts/main/debug.sh | awk '{print $1}' > hash/debug.hash
+
+      # ----------------- report.sh -----------------
+      - name: Get current report
+        id: ver_report
+        run: |
+          VERSION=$(grep 'VERSION="' scripts/main/report.sh | head -1 | cut -d'"' -f2)
+          echo "current=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Increment patch report
+        id: new_report
+        run: |
+          CURRENT="${{ steps.ver_report.outputs.current }}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          PATCH=$((PATCH + 1))
+          NEW="$MAJOR.$MINOR.$PATCH"
+          echo "version=$NEW" >> $GITHUB_OUTPUT
+
+      - name: Update report.sh version
+        run: |
+          sed -i "s/VERSION=\"[0-9.]*\"/VERSION=\"${{ steps.new_report.outputs.version }}\"/" scripts/main/report.sh
+
+      - name: Update report.hash
+        run: |
+          sha256sum scripts/main/report.sh | awk '{print $1}' > hash/report.hash
+
+      # ----------------- Update README badges -----------------
+      - name: Update README badges
+        run: |
+          NEW_RUSSIAN="${{ steps.new_russian.outputs.version }}"
+          NEW_DEBUG="${{ steps.new_debug.outputs.version }}"
+          NEW_REPORT="${{ steps.new_report.outputs.version }}"
+
+          # Бейджи версий (путь docs/README.md)
+          sed -i "s/-[0-9]\+\.[0-9]\+\.[0-9]\+-brightgreen/-$NEW_RUSSIAN-brightgreen/" docs/README.md
+          sed -i "s/-[0-9]\+\.[0-9]\+\.[0-9]\+-blue/-$NEW_DEBUG-blue/" docs/README.md
+          sed -i "s/-[0-9]\+\.[0-9]\+\.[0-9]\+-blue/-$NEW_REPORT-blue/" docs/README.md
+
+          # Счётчик установок
+          sed -i "s/версии [0-9.]\+/версии $NEW_RUSSIAN/" docs/README.md
+          sed -i "s/version=[0-9.]\+/version=$NEW_RUSSIAN/" docs/README.md
+ 
+      # ----------------- Commit and push -----------------
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Добавляем файл из папки hash/
-          git add hash/version.hash
-          
-          if git diff --cached --quiet; then
-            echo "ℹ️ Нет изменений для коммита"
-          else
-            git commit -m "🤖 Обновление version.hash [skip ci]"
-            git push
-            echo "✅ Изменения запушены"
-          fi
+          git config user.email "github-actions[bot]@://github.com"
+          git add scripts/main/*.sh hash/*.hash docs/README.md
+          git diff --cached --quiet && echo "No changes to commit" && exit 0
+          COMMIT_MSG="🔖 Bump versions: russian ${{ steps.new_russian.outputs.version }}, debug ${{ steps.new_debug.outputs.version }}, report ${{ steps.new_report.outputs.version }} [skip ci]"
+          git commit -m "$COMMIT_MSG"
+          git pull --rebase origin master
+          git push origin master
