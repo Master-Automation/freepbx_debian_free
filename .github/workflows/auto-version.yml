@@ -3,9 +3,11 @@ name: Auto-version
 on:
   push:
     paths:
+      - 'scripts/main/install.sh'
       - 'scripts/main/russian.sh'
       - 'scripts/utils/debug.sh'
       - 'scripts/utils/report.sh'
+      - 'scripts/utils/system-pre-check.sh'
     branches:
       - master
   workflow_dispatch:
@@ -22,103 +24,82 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      # ----------------- russian.sh (в папке main) -----------------
-      - name: Get current russian
-        id: ver_russian
+      # ----------------- 1. install.sh (main) -----------------
+      - name: Process install.sh
+        id: proc_install
+        run: |
+          VERSION=$(grep 'VERSION="' scripts/main/install.sh | head -1 | cut -d'"' -f2)
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          NEW_VER="$MAJOR.$MINOR.$((PATCH + 1))"
+          sed -i "s/VERSION=\"[0-9.]*\"/VERSION=\"$NEW_VER\"/" scripts/main/install.sh
+          sha256sum scripts/main/install.sh | awk '{print $1}' > hash/install.hash
+          echo "version=$NEW_VER" >> $GITHUB_OUTPUT
+
+      # ----------------- 2. russian.sh (main) -----------------
+      - name: Process russian.sh
+        id: proc_russian
         run: |
           VERSION=$(grep 'SCRIPT_VERSION="' scripts/main/russian.sh | head -1 | cut -d'"' -f2)
-          echo "current=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Increment patch russian
-        id: new_russian
-        run: |
-          CURRENT="${{ steps.ver_russian.outputs.current }}"
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
-          PATCH=$((PATCH + 1))
-          NEW="$MAJOR.$MINOR.$PATCH"
-          echo "version=$NEW" >> $GITHUB_OUTPUT
-
-      - name: Update russian.sh version
-        run: |
-          sed -i "s/SCRIPT_VERSION=\"[0-9.]*\"/SCRIPT_VERSION=\"${{ steps.new_russian.outputs.version }}\"/" scripts/main/russian.sh
-
-      - name: Update russian.hash
-        run: |
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          NEW_VER="$MAJOR.$MINOR.$((PATCH + 1))"
+          sed -i "s/SCRIPT_VERSION=\"[0-9.]*\"/SCRIPT_VERSION=\"$NEW_VER\"/" scripts/main/russian.sh
           sha256sum scripts/main/russian.sh | awk '{print $1}' > hash/russian.hash
+          echo "version=$NEW_VER" >> $GITHUB_OUTPUT
 
-      # ----------------- debug.sh (в папке utils) -----------------
-      - name: Get current debug
-        id: ver_debug
+      # ----------------- 3. debug.sh (utils) -----------------
+      - name: Process debug.sh
+        id: proc_debug
         run: |
           VERSION=$(grep 'VERSION="' scripts/utils/debug.sh | head -1 | cut -d'"' -f2)
-          echo "current=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Increment patch debug
-        id: new_debug
-        run: |
-          CURRENT="${{ steps.ver_debug.outputs.current }}"
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
-          PATCH=$((PATCH + 1))
-          NEW="$MAJOR.$MINOR.$PATCH"
-          echo "version=$NEW" >> $GITHUB_OUTPUT
-
-      - name: Update debug.sh version
-        run: |
-          sed -i "s/VERSION=\"[0-9.]*\"/VERSION=\"${{ steps.new_debug.outputs.version }}\"/" scripts/utils/debug.sh
-
-      - name: Update debug.hash
-        run: |
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          NEW_VER="$MAJOR.$MINOR.$((PATCH + 1))"
+          sed -i "s/VERSION=\"[0-9.]*\"/VERSION=\"$NEW_VER\"/" scripts/utils/debug.sh
           sha256sum scripts/utils/debug.sh | awk '{print $1}' > hash/debug.hash
+          echo "version=$NEW_VER" >> $GITHUB_OUTPUT
 
-      # ----------------- report.sh (в папке utils) -----------------
-      - name: Get current report
-        id: ver_report
+      # ----------------- 4. report.sh (utils) -----------------
+      - name: Process report.sh
+        id: proc_report
         run: |
           VERSION=$(grep 'VERSION="' scripts/utils/report.sh | head -1 | cut -d'"' -f2)
-          echo "current=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Increment patch report
-        id: new_report
-        run: |
-          CURRENT="${{ steps.ver_report.outputs.current }}"
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
-          PATCH=$((PATCH + 1))
-          NEW="$MAJOR.$MINOR.$PATCH"
-          echo "version=$NEW" >> $GITHUB_OUTPUT
-
-      - name: Update report.sh version
-        run: |
-          sed -i "s/VERSION=\"[0-9.]*\"/VERSION=\"${{ steps.new_report.outputs.version }}\"/" scripts/utils/report.sh
-
-      - name: Update report.hash
-        run: |
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          NEW_VER="$MAJOR.$MINOR.$((PATCH + 1))"
+          sed -i "s/VERSION=\"[0-9.]*\"/VERSION=\"$NEW_VER\"/" scripts/utils/report.sh
           sha256sum scripts/utils/report.sh | awk '{print $1}' > hash/report.hash
+          echo "version=$NEW_VER" >> $GITHUB_OUTPUT
+
+      # ----------------- 5. system-pre-check.sh (utils) -----------------
+      - name: Process system-pre-check.sh
+        id: proc_check
+        run: |
+          VERSION=$(grep 'VERSION="' scripts/utils/system-pre-check.sh | head -1 | cut -d'"' -f2)
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          NEW_VER="$MAJOR.$MINOR.$((PATCH + 1))"
+          sed -i "s/VERSION=\"[0-9.]*\"/VERSION=\"$NEW_VER\"/" scripts/utils/system-pre-check.sh
+          sha256sum scripts/utils/system-pre-check.sh | awk '{print $1}' > hash/system-pre-check.hash
+          echo "version=$NEW_VER" >> $GITHUB_OUTPUT
 
       # ----------------- Update README badges -----------------
       - name: Update README badges
         run: |
-          NEW_RUSSIAN="${{ steps.new_russian.outputs.version }}"
-          NEW_DEBUG="${{ steps.new_debug.outputs.version }}"
-          NEW_REPORT="${{ steps.new_report.outputs.version }}"
-
-          # Бейджи версий в docs/README.md
-          sed -i "s/-[0-9]\+\.[0-9]\+\.[0-9]\+-brightgreen/-$NEW_RUSSIAN-brightgreen/" docs/README.md
-          sed -i "s/-[0-9]\+\.[0-9]\+\.[0-9]\+-blue/-$NEW_DEBUG-blue/" docs/README.md
-          sed -i "s/-[0-9]\+\.[0-9]\+\.[0-9]\+-blue/-$NEW_REPORT-blue/" docs/README.md
-
-          # Счётчик установок
-          sed -i "s/версии [0-9.]\+/версии $NEW_RUSSIAN/" docs/README.md
-          sed -i "s/version=[0-9.]\+/version=$NEW_RUSSIAN/" docs/README.md
+          # Обновление всех бейджей версий
+          sed -i "s/-install-[0-9.]\+/-install-${{ steps.proc_install.outputs.version }}/g" docs/README.md
+          sed -i "s/-russian-[0-9.]\+/-russian-${{ steps.proc_russian.outputs.version }}/g" docs/README.md
+          sed -i "s/-debug-[0-9.]\+/-debug-${{ steps.proc_debug.outputs.version }}/g" docs/README.md
+          sed -i "s/-report-[0-9.]\+/-report-${{ steps.proc_report.outputs.version }}/g" docs/README.md
+          sed -i "s/-pre--check-[0-9.]\+/-pre--check-${{ steps.proc_check.outputs.version }}/g" docs/README.md
+          
+          # Счётчик и общая версия (завязано на russian)
+          sed -i "s/версии [0-9.]\+/версии ${{ steps.proc_russian.outputs.version }}/g" docs/README.md
+          sed -i "s/version=[0-9.]\+/version=${{ steps.proc_russian.outputs.version }}/g" docs/README.md
  
       # ----------------- Commit and push -----------------
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@://github.com"
-          # Добавляем всё: скрипты из обеих папок, хеши и README
           git add scripts/main/*.sh scripts/utils/*.sh hash/*.hash docs/README.md
           git diff --cached --quiet && echo "No changes to commit" && exit 0
-          COMMIT_MSG="🔖 Bump versions [skip ci]"
-          git commit -m "$COMMIT_MSG"
+          git commit -m "🔖 Bump versions and update hashes [skip ci]"
           git pull --rebase origin master
           git push origin master
