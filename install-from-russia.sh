@@ -459,35 +459,7 @@ check_freepbx() {
     fi
 }
 
-check_digium_phones_version() {
-    installed_version=$(asterisk -rx 'digium_phones show version' | awk '/Version/{print $NF}' 2>/dev/null)
-    if [[ -n "$installed_version" ]]; then
-        required_version="21.0_3.6.8"
-        present_version=$(echo "$installed_version" | sed 's/_/./g')
-        required_version=$(echo "$required_version" | sed 's/_/./g')
-        if dpkg --compare-versions "$present_version" "lt" "$required_version"; then
-            message "A newer version of Digium Phones module is available."
-        else
-            message "Installed Digium Phones module version: ($installed_version)"
-        fi
-    else
-        message "Failed to check Digium Phones module version."
-    fi
-}
 
-check_asterisk() {
-    if ! dpkg -l | grep -q 'asterisk'; then
-        message "Asterisk is not installed. Please install Asterisk to proceed."
-    else
-        check_asterisk_version=$(asterisk -V)
-        message "$check_asterisk_version"
-	if asterisk -rx "module show" | grep -q "res_digium_phone.so"; then
-            check_digium_phones_version
-        else
-            message "Digium Phones module is not loaded. Please make sure it is installed and loaded correctly."
-        fi
-    fi
-}
 
 hold_packages() {
     # List of package names to hold
@@ -681,7 +653,6 @@ DEPPRODPKGS=(
 	"libical3"
 	"libneon27"
 	"libsnmp40"
-	"libtonezone"
 	"libbluetooth3"
 	"libunbound8"
 	"libsybdb5"
