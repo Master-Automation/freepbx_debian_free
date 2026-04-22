@@ -2,7 +2,9 @@
 
 # =============================================================================
 # check-system.sh – Диагност и разведчик для FreePBX 17
-# Версия: 1.1.0
+# Версия: 7.0.0
+# =============================================================================
+
 # =============================================================================
 # ОГЛАВЛЕНИЕ:
 #   1.  check_os               – Debian 12, архитектура amd64
@@ -13,19 +15,20 @@
 #   6.  check_apt              – наличие apt-get и его работа
 #   7.  check_conflicts        – нет уже установленных FreePBX/Asterisk/MySQL
 #   8.  check_hostname         – hostname не localhost и корректный
-#   9.  check_russian_mirrors  – доступность зеркал (Яндекс, deb.freepbx.org)
-#  10.  check_repo_sangoma     – доступность репозитория Sangoma (бинарники)
-#  11.  check_github           – доступность GitHub
-#  12.  check_freepbx_core_source – доступность архива с исходным кодом FreePBX core
-#  13.  check_php_ioncube      – проверка PHP 8.2 и ionCube (для FreePBX)
-#  14.  check_freepbx_readiness – комбинация проверок для FreePBX
-#  15.  RUN_CRITICAL           – набор критических проверок (1-4,6)
-#  16.  RUN_NETWORK            – набор сетевых проверок (4,11)
-#  17.  RUN_REPOSITORIES       – набор проверок репозиториев (9,10,11)
-#  18.  RUN_BINARIES_READY     – доступность репозитория Sangoma (10)
-#  19.  RUN_SOURCES_READY      – доступность GitHub и архива core (11,12)
-#  20.  RUN_PREFLIGHT          – комбинация CRITICAL+NETWORK+REPOSITORIES+SOURCES_READY
-#  21.  RUN_CHECK_BY_NAME      – диспетчер для вызова отдельных проверок
+#   9.  check_russian_mirrors  – доступность зеркала Яндекса
+#  10.  check_repo_sangoma     – доступность репозитория Sangoma (бинарный Asterisk)
+#  11.  check_freepbx_binary   – доступность бинарного пакета FreePBX (deb) на GitHub
+#  12.  check_freepbx_source   – доступность исходного кода FreePBX core на GitHub
+#  13.  check_asterisk_source  – доступность исходного кода Asterisk на GitHub
+#  14.  check_php_ioncube      – проверка PHP 8.2 и ionCube (для FreePBX)
+#  15.  check_freepbx_readiness – комбинация проверок для FreePBX
+#  16.  RUN_CRITICAL           – набор критических проверок (1-4,6)
+#  17.  RUN_NETWORK            – набор сетевых проверок (4)
+#  18.  RUN_REPOSITORIES       – набор проверок репозиториев (9,10)
+#  19.  RUN_BINARIES_READY     – доступность бинарного пакета FreePBX (11)
+#  20.  RUN_SOURCES_READY      – доступность исходников FreePBX и Asterisk (12,13)
+#  21.  RUN_PREFLIGHT          – комбинация CRITICAL+NETWORK+REPOSITORIES+SOURCES_READY
+#  22.  RUN_CHECK_BY_NAME      – диспетчер для вызова отдельных проверок
 # =============================================================================
 
 set -e
@@ -33,16 +36,21 @@ set -e
 # -----------------------------------------------------------------------------
 # Переменные и настройки
 # -----------------------------------------------------------------------------
-SCRIPT_VERSION="1.1.0"
+SCRIPT_VERSION="7.0.0"
 QUIET=false
 error_count=0
 warn_count=0
 
-# Версия ядра FreePBX для установки из исходников
+# Версии для проверки (меняйте здесь)
 FREEPBX_CORE_VERSION="17.0.18.45"
-FREEPBX_CORE_URL="https://github.com/FreePBX/core/archive/refs/tags/release/${FREEPBX_CORE_VERSION}.tar.gz"
+ASTERISK_VERSION="22.9.0"
 
-# Цвета для вывода (если не тихий режим)
+# URL для проверок
+FREEPBX_DEB_URL="https://github.com/FreePBX/deb-repository/releases/download/${FREEPBX_CORE_VERSION}/freepbx_${FREEPBX_CORE_VERSION}_amd64.deb"
+FREEPBX_SOURCE_URL="https://github.com/FreePBX/core/archive/refs/tags/release/${FREEPBX_CORE_VERSION}.tar.gz"
+ASTERISK_SOURCE_URL="https://github.com/asterisk/asterisk/releases/download/${ASTERISK_VERSION}/asterisk-${ASTERISK_VERSION}.tar.gz"
+
+# Цвета для вывода
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -157,7 +165,6 @@ check_internet() {
         log_success "DNS работает (github.com разрешается)"
     else
         log_warning "GitHub может быть недоступен (проверьте DNS)"
-        # не возвращаем ошибку, только предупреждение
     fi
     return 0
 }
@@ -190,10 +197,8 @@ check_apt() {
         log_error "apt-get не найден. Это не Debian/Ubuntu?"
         return 30
     fi
-    # Проверка, что apt-get может обновить кэш (сухая проверка)
     if ! apt-get update --dry-run > /dev/null 2>&1; then
         log_warning "apt-get update --dry-run не удался (возможно, проблемы с сетью или репозиториями)"
-        # но не считаем это фатальным, только предупреждение
     fi
     log_success "apt-get доступен"
     return 0
@@ -240,67 +245,75 @@ check_hostname() {
 # 9. Проверка российских зеркал
 # -----------------------------------------------------------------------------
 check_russian_mirrors() {
-    local problem=false
-    # Зеркало Яндекса (Debian) – Проверено: доступно
     if curl -s --connect-timeout 5 https://mirror.yandex.ru/debian/ > /dev/null 2>&1; then
         log_success "Зеркало Яндекса (mirror.yandex.ru) доступно"
+        return 0
     else
         log_warning "Зеркало Яндекса недоступно – скрипт переключится на официальные репозитории"
-        problem=true
+        return 20
     fi
-    # Официальный репозиторий Sangoma (deb.freepbx.org) – Проверено: часто недоступен из РФ
-    if curl -s --connect-timeout 5 http://deb.freepbx.org > /dev/null 2>&1; then
-        log_success "Официальный репозиторий FreePBX (deb.freepbx.org) доступен"
-    else
-        log_warning "Официальный репозиторий FreePBX недоступен – установка из бинарников невозможна"
-        problem=true
-    fi
-    $problem && return 20 || return 0
 }
 
 # -----------------------------------------------------------------------------
-# 10. Проверка доступности репозитория Sangoma (бинарники)
+# 10. Проверка доступности репозитория Sangoma (бинарный Asterisk)
 # -----------------------------------------------------------------------------
 check_repo_sangoma() {
-    if curl -s --connect-timeout 5 http://deb.freepbx.org/freepbx17-prod/dists/bookworm/InRelease > /dev/null 2>&1; then
+    if curl -s --connect-timeout 5 http://deb.freepbx.org > /dev/null 2>&1; then
         log_success "Репозиторий Sangoma (deb.freepbx.org) доступен"
         return 0
     else
-        log_warning "Репозиторий Sangoma недоступен – установка из бинарников невозможна"
+        log_warning "Репозиторий Sangoma недоступен – установка бинарного Asterisk невозможна"
         return 21
     fi
 }
 
 # -----------------------------------------------------------------------------
-# 11. Проверка доступности GitHub (исходники)
+# 11. Проверка доступности бинарного пакета FreePBX (deb) на GitHub
 # -----------------------------------------------------------------------------
-check_github() {
-    if curl -s --connect-timeout 5 https://github.com > /dev/null 2>&1; then
-        log_success "GitHub доступен"
+check_freepbx_binary() {
+    local http_code
+    http_code=$(curl -s --head --connect-timeout 10 --max-time 15 -o /dev/null -w "%{http_code}" "$FREEPBX_DEB_URL")
+    if [ "$http_code" = "200" ]; then
+        log_success "Бинарный пакет FreePBX $FREEPBX_CORE_VERSION доступен (deb)"
         return 0
     else
-        log_error "GitHub недоступен – установка из исходников невозможна"
-        return 22
+        log_warning "Бинарный пакет FreePBX недоступен (HTTP $http_code)"
+        return 25
     fi
 }
 
 # -----------------------------------------------------------------------------
-# 12. Проверка доступности архива с исходным кодом FreePBX core
+# 12. Проверка доступности исходного кода FreePBX core на GitHub
 # -----------------------------------------------------------------------------
-check_freepbx_core_source() {
+check_freepbx_source() {
     local http_code
-    http_code=$(curl -s --head --connect-timeout 10 --max-time 15 -o /dev/null -w "%{http_code}" "$FREEPBX_CORE_URL")
+    http_code=$(curl -s --head --connect-timeout 10 --max-time 15 -o /dev/null -w "%{http_code}" "$FREEPBX_SOURCE_URL")
     if [ "$http_code" = "200" ]; then
         log_success "Исходный код FreePBX core $FREEPBX_CORE_VERSION доступен"
         return 0
     else
-        log_error "Исходный код FreePBX core $FREEPBX_CORE_VERSION недоступен (HTTP $http_code)"
+        log_error "Исходный код FreePBX core недоступен (HTTP $http_code)"
         return 24
     fi
 }
 
 # -----------------------------------------------------------------------------
-# 13. Проверка PHP 8.2 и ionCube (для FreePBX)
+# 13. Проверка доступности исходного кода Asterisk на GitHub
+# -----------------------------------------------------------------------------
+check_asterisk_source() {
+    local http_code
+    http_code=$(curl -s --head --connect-timeout 10 --max-time 15 -o /dev/null -w "%{http_code}" "$ASTERISK_SOURCE_URL")
+    if [ "$http_code" = "200" ]; then
+        log_success "Исходный код Asterisk $ASTERISK_VERSION доступен"
+        return 0
+    else
+        log_error "Исходный код Asterisk недоступен (HTTP $http_code)"
+        return 27
+    fi
+}
+
+# -----------------------------------------------------------------------------
+# 14. Проверка PHP 8.2 и ionCube (для FreePBX)
 # -----------------------------------------------------------------------------
 check_php_ioncube() {
     local ok=true
@@ -316,21 +329,21 @@ check_php_ioncube() {
             log_success "PHP версия $PHP_VERSION"
         fi
     fi
-    # ionCube не проверяем глубоко (он нужен только для коммерческих модулей)
     log_warning "ionCube Loader не проверяется (требуется только для коммерческих модулей)"
     $ok && return 0 || return 70
 }
 
 # -----------------------------------------------------------------------------
-# 14. Комплексная проверка готовности к установке FreePBX
+# 15. Комплексная проверка готовности к установке FreePBX
 # -----------------------------------------------------------------------------
 check_freepbx_readiness() {
-    run_check "CHECK_REPO_SANGOMA" check_repo_sangoma || return $?
-    run_check "CHECK_GITHUB" check_github || return $?
-    run_check "CHECK_FREEPBX_CORE_SOURCE" check_freepbx_core_source || return $?
-    run_check "CHECK_PHP_IONCUBE" check_php_ioncube || return $?
-    run_check "CHECK_APT" check_apt || return $?
-    run_check "CHECK_INTERNET" check_internet || return $?
+    run_check "CHECK_REPO_SANGOMA"     check_repo_sangoma     || return $?
+    run_check "CHECK_FREEPBX_BINARY"   check_freepbx_binary   || true
+    run_check "CHECK_FREEPBX_SOURCE"   check_freepbx_source   || return $?
+    run_check "CHECK_ASTERISK_SOURCE"  check_asterisk_source  || return $?
+    run_check "CHECK_PHP_IONCUBE"      check_php_ioncube      || return $?
+    run_check "CHECK_APT"              check_apt              || return $?
+    run_check "CHECK_INTERNET"         check_internet         || return $?
     return 0
 }
 
@@ -348,25 +361,23 @@ RUN_CRITICAL() {
 
 RUN_NETWORK() {
     run_check "CHECK_INTERNET" check_internet || return $?
-    run_check "CHECK_GITHUB"   check_github   || return $?
     return 0
 }
 
 RUN_REPOSITORIES() {
     run_check "CHECK_RUSSIAN_MIRRORS" check_russian_mirrors || return $?
     run_check "CHECK_REPO_SANGOMA"    check_repo_sangoma    || return $?
-    run_check "CHECK_GITHUB"          check_github          || return $?
     return 0
 }
 
 RUN_BINARIES_READY() {
-    run_check "CHECK_REPO_SANGOMA" check_repo_sangoma || return $?
+    run_check "CHECK_FREEPBX_BINARY" check_freepbx_binary || return $?
     return 0
 }
 
 RUN_SOURCES_READY() {
-    run_check "CHECK_GITHUB"              check_github              || return $?
-    run_check "CHECK_FREEPBX_CORE_SOURCE" check_freepbx_core_source || return $?
+    run_check "CHECK_FREEPBX_SOURCE"  check_freepbx_source  || return $?
+    run_check "CHECK_ASTERISK_SOURCE" check_asterisk_source || return $?
     return 0
 }
 
@@ -383,7 +394,6 @@ RUN_PREFLIGHT() {
 # -----------------------------------------------------------------------------
 run_check_by_name() {
     local name="$1"
-    log_message "   ${BLUE}▶ Выполняется: $name${NC}"
     case "$name" in
         CHECK_OS)                   check_os ;;
         CHECK_PERMISSIONS)          check_permissions ;;
@@ -395,8 +405,9 @@ run_check_by_name() {
         CHECK_HOSTNAME)             check_hostname ;;
         CHECK_RUSSIAN_MIRRORS)      check_russian_mirrors ;;
         CHECK_REPO_SANGOMA)         check_repo_sangoma ;;
-        CHECK_GITHUB)               check_github ;;
-        CHECK_FREEPBX_CORE_SOURCE)  check_freepbx_core_source ;;
+        CHECK_FREEPBX_BINARY)       check_freepbx_binary ;;
+        CHECK_FREEPBX_SOURCE)       check_freepbx_source ;;
+        CHECK_ASTERISK_SOURCE)      check_asterisk_source ;;
         CHECK_PHP_IONCUBE)          check_php_ioncube ;;
         CHECK_FREEPBX_READINESS)    check_freepbx_readiness ;;
         RUN_CRITICAL)               RUN_CRITICAL ;;
