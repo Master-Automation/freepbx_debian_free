@@ -481,6 +481,22 @@ check_github() {
 }
 
 
+# -----------------------------------------------------------------------------
+# 11a. Проверка доступности архива FreePBX core 17.0.18.45
+# -----------------------------------------------------------------------------
+check_freepbx_core_tarball() {
+   local url="https://github.com/FreePBX/core/archive/refs/tags/release/17.0.18.45.tar.gz"
+   local http_code
+   http_code=$(curl -s --head --connect-timeout 10 --max-time 15 -o /dev/null -w "%{http_code}" "$url")
+   if [ "$http_code" = "200" ]; then
+       log_success "Архив FreePBX core 17.0.18.45 доступен"
+       return 0
+   else
+       log_error "Архив FreePBX core 17.0.18.45 недоступен (HTTP $http_code). Проверьте URL или сеть."
+       return 23
+   fi
+}
+
 
 # -----------------------------------------------------------------------------
 # 12. Проверка PHP 8.2 и ionCube (для FreePBX)
@@ -622,11 +638,8 @@ RUN_PREFLIGHT() {
 # -----------------------------------------------------------------------------
 
 run_check_by_name() {
-
    local name="$1"
-
    case "$name" in
-
        CHECK_OS)                   check_os ;;
        CHECK_PERMISSIONS)          check_permissions ;;
        CHECK_DISK_SPACE)           check_disk_space ;;
@@ -638,6 +651,7 @@ run_check_by_name() {
        CHECK_RUSSIAN_MIRRORS)      check_russian_mirrors ;;
        CHECK_REPO_SANGOMA)         check_repo_sangoma ;;
        CHECK_GITHUB)               check_github ;;
+       CHECK_FREEPBX_CORE_TARBALL) check_freepbx_core_tarball ;;
        CHECK_PHP_IONCUBE)          check_php_ioncube ;;
        CHECK_FREEPBX_READINESS)    check_freepbx_readiness ;;
        RUN_CRITICAL)               RUN_CRITICAL ;;
@@ -647,19 +661,12 @@ run_check_by_name() {
        RUN_SOURCES_READY)          RUN_SOURCES_READY ;;
        RUN_PREFLIGHT)              RUN_PREFLIGHT ;;
        *)
-
            echo "Неизвестная проверка: $name"
-
            exit 0
-
            ;;
-
    esac
-
    local code=$?
-
    exit $code
-
 }
 
 # -----------------------------------------------------------------------------
