@@ -12,6 +12,16 @@ if [[ $EUID -ne 0 ]]; then echo "Запустите от root"; exit 1; fi
 systemctl stop asterisk 2>/dev/null || true
 rm -rf /etc/asterisk /var/lib/asterisk /var/log/asterisk /var/run/asterisk /usr/lib/asterisk /usr/sbin/asterisk
 
+# Удаляем оставшийся файл репозитория FreePBX
+rm -f /etc/apt/sources.list.d/freepbx.list 2>/dev/null
+
+# Убираем дубликаты из основного sources.list (если они там есть)
+if [ -f /etc/apt/sources.list ]; then
+    awk '!seen[$0]++' /etc/apt/sources.list > /etc/apt/sources.list.clean \
+        && mv /etc/apt/sources.list.clean /etc/apt/sources.list
+fi
+
+
 echo "[2/10] Установка зависимостей..."
 apt-get update
 apt-get install -y wget curl git build-essential pkg-config libedit-dev libjansson-dev libsqlite3-dev uuid-dev libxml2-dev libssl-dev libncurses5-dev unixodbc-dev unixodbc python3 python3-pip sox mpg123
@@ -171,7 +181,31 @@ sleep 3
 echo "[10/10] Проверка..."
 asterisk -rx "core show version"
 asterisk -rx "pjsip show endpoints" | head -20
+
+# ===============================
+# ПРЕДЛОЖЕНИЕ СОЗДАТЬ БЭКАП
+# ===============================
+echo ""
+echo "=============================================="
+echo " Установка Asterisk завершена успешно!"
+echo "=============================================="
+echo " Для быстрого восстановления системы в офлайн-режиме"
+echo " вы можете создать полный образ (снапшот) виртуальной машины"
+echo " и/или архив конфигурационных файлов."
+echo ""
+echo " Чтобы создать архив конфигураций (лёгкий бэкап):"
+echo "   sudo tar czf /root/asterisk_backup_$(date +%Y%m%d).tar.gz \\"
+echo "     /etc/asterisk /var/lib/asterisk /usr/lib/asterisk /var/log/asterisk"
+echo ""
+echo " Для полного образа системы (если вы в виртуальной среде):"
+echo "   - В каталоге вашей виртуализации сделайте клон/снапшот ВМ."
+echo "   - Или создайте образ диска с помощью Clonezilla/dd."
+echo ""
+echo " Рекомендуется также сохранить этот скрипт для повторной установки."
+echo "=============================================="
+
 echo "=== Установка завершена! ==="
+
 SCRIPT_EOF
 
 chmod +x asterisk_full.sh
