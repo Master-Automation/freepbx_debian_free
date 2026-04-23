@@ -113,6 +113,7 @@ contrib/scripts/install_prereq install
 
 # Меню выбора модулей: отключаем потенциально проблемные и ненужные модули
 make menuselect.makeopts
+
 # Отключение модулей, которые могут быть проблемными
 menuselect/menuselect --disable BUILD_NATIVE menuselect.makeopts
 menuselect/menuselect --disable chan_ooh323 menuselect.makeopts
@@ -130,9 +131,22 @@ menuselect/menuselect --disable res_stasis_playback menuselect.makeopts
 menuselect/menuselect --disable res_stasis_recording menuselect.makeopts
 menuselect/menuselect --disable res_config_sqlite3 menuselect.makeopts
 
+# Включаем только нужные звуки (английские и русские, форматы GSM и ALAW)
+menuselect/menuselect --enable CORE-SOUNDS-EN-GSM menuselect.makeopts
+menuselect/menuselect --enable CORE-SOUNDS-EN-ALAW menuselect.makeopts
+menuselect/menuselect --enable CORE-SOUNDS-RU-GSM menuselect.makeopts
+menuselect/menuselect --enable CORE-SOUNDS-RU-ALAW menuselect.makeopts
+
+# Опционально: отключаем все остальные форматы тех же языков, чтобы не качать лишнее
+menuselect/menuselect --disable CORE-SOUNDS-EN-WAV menuselect.makeopts
+menuselect/menuselect --disable CORE-SOUNDS-EN-ULAW menuselect.makeopts
+menuselect/menuselect --disable CORE-SOUNDS-RU-WAV menuselect.makeopts
+menuselect/menuselect --disable CORE-SOUNDS-RU-ULAW menuselect.makeopts
+
 # Компиляция и установка
 make -j$(nproc)
 make install
+make install-core-sounds
 make config
 make samples
 
