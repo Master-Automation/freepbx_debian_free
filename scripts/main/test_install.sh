@@ -469,8 +469,6 @@ chown asterisk:asterisk /var/run/asterisk
 chmod 755 /var/run/asterisk
 rm -f /var/run/asterisk/asterisk.ctl
 
-
-
 # -----------------------------------------------------------------------------
 # 13. Настройка прав доступа к файлам Asterisk
 # -----------------------------------------------------------------------------
@@ -480,97 +478,4 @@ chmod -R 755 /etc/asterisk /var/lib/asterisk /var/log/asterisk /var/run/asterisk
 # Перезапуск Asterisk для применения конфигурации
 systemctl restart asterisk
 
-# -----------------------------------------------------------------------------
-# 14. Установка FreePBX 17 из официального репозитория GitHub
-# -----------------------------------------------------------------------------
-echo "[7/12] Установка FreePBX 17..."
-
-cd /tmp
-wget https://raw.githubusercontent.com/FreePBX/sng_freepbx_debian_install/master/sng_freepbx_debian_install.sh
-chmod +x sng_freepbx_debian_install.sh
-
-# Важно: Используем флаг --opensourceonly
-bash ./sng_freepbx_debian_install.sh --opensourceonly
-
-# После установки FreePBX некоторые файлы могли перезаписаться. Переустанавливаем права.
-chown -R $AST_USER:$AST_GROUP /etc/asterisk /var/lib/asterisk /var/log/asterisk /var/run/asterisk /usr/lib/asterisk
-
-# -----------------------------------------------------------------------------
-# 15. Конфигурация базы данных для FreePBX
-# -----------------------------------------------------------------------------
-echo "[8/12] Тонкая настройка базы данных MariaDB..."
-
-mysql <<EOF
-DELETE FROM mysql.user WHERE User='';
-DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
-DROP DATABASE IF EXISTS test;
-DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
-CREATE DATABASE IF NOT EXISTS asterisk;
-CREATE DATABASE IF NOT EXISTS asteriskcdrdb;
-GRANT ALL PRIVILEGES ON asterisk.* TO 'freepbxuser'@'localhost' IDENTIFIED BY '${FREEPBX_DB_PASS}';
-GRANT ALL PRIVILEGES ON asteriskcdrdb.* TO 'freepbxuser'@'localhost';
-FLUSH PRIVILEGES;
-EOF
-
-# Настройка подключения FreePBX к базе данных
-cat > /etc/freepbx.conf <<EOF
-<?php
-\$amp_conf['AMPDBUSER'] = 'freepbxuser';
-\$amp_conf['AMPDBPASS'] = '${FREEPBX_DB_PASS}';
-\$amp_conf['AMPDBHOST'] = 'localhost';
-\$amp_conf['AMPDBNAME'] = 'asterisk';
-\$amp_conf['AMPDBENGINE'] = 'mysql';
-?>
-EOF
-
-# -----------------------------------------------------------------------------
-# 16. Финальные настройки
-# -----------------------------------------------------------------------------
-echo "[9/12] Финальная настройка сервисов..."
-
-# Настройка веб-сервера Apache для FreePBX
-a2enmod rewrite
-systemctl restart apache2
-
-# Настройка прав на директории для веб-интерфейса
-mkdir -p /var/www/html
-chown -R www-data:www-data /var/www/html
-chmod -R 755 /var/www/html
-
-# Выполнение начальной настройки FreePBX через консоль
-sudo -u $AST_USER fwconsole ma downloadinstall userman
-sudo -u $AST_USER fwconsole reload
-
-# Финальная перезагрузка всех сервисов
-systemctl restart mariadb
-systemctl restart asterisk
-systemctl restart apache2
-
-# -----------------------------------------------------------------------------
-# 17. Заключительная информация
-# -----------------------------------------------------------------------------
-echo "================================================================"
-echo "Установка успешно завершена!"
-echo "================================================================"
-echo "Asterisk и FreePBX 17 установлены и настроены."
-echo "База данных:"
-echo "  - Имя БД: asterisk, asteriskcdrdb"
-echo "  - Пользователь: freepbxuser"
-echo "  - Пароль: ${FREEPBX_DB_PASS}"
-echo "================================================================"
-echo "Для доступа к веб-интерфейсу FreePBX откройте в браузере:"
-echo "http://$(hostname -I | awk '{print $1}')"
-echo "================================================================"
-echo "Для подключения SIP-телефонов используйте:"
-echo "  - Сервер: IP этого сервера"
-echo "  - Порт: 5060 (UDP)"
-echo "  - Диапазон номеров: 6001 - 6030"
-echo "  - Пароль для номера XXXX: XXXXpbx (например, для 6001 пароль 6001pbx)"
-echo "================================================================"
-echo "Для начала работы с FreePBX выполните первичную настройку:"
-echo "# fwconsole ma downloadinstall userman"
-echo "# fwconsole ma downloadinstall certman"
-echo "# fwconsole reload"
-echo "================================================================"
-echo "Логи установки: /var/log/voip_full_install.log"
 echo "=== Установка закончена: $(date) ==="
