@@ -285,6 +285,47 @@ make install-core-sounds
 make config
 make samples
 
+# --- Создание недостающих конфигурационных файлов (предотвращение ошибок запуска) ---
+echo "[*] Создание базовых конфигов Asterisk..."
+
+# 1. modules.conf (если отсутствует)
+if [ ! -f /etc/asterisk/modules.conf ]; then
+    cat > /etc/asterisk/modules.conf <<EOF
+[modules]
+autoload=yes
+EOF
+fi
+
+# 2. stasis.conf (предотвращает ошибку "Could not find option 'minimum_size'")
+if [ ! -f /etc/asterisk/stasis.conf ]; then
+    cat > /etc/asterisk/stasis.conf <<EOF
+[stasis]
+minimum_size = 1
+EOF
+fi
+
+# 3. logger.conf (базовый, чтобы не ругался)
+if [ ! -f /etc/asterisk/logger.conf ]; then
+    cat > /etc/asterisk/logger.conf <<EOF
+[general]
+dateformat=%F %T
+
+[logfiles]
+console => notice,warning,error
+full => notice,warning,error,debug,verbose
+EOF
+fi
+
+# 4. Создание и настройка прав на /var/run/asterisk
+mkdir -p /var/run/asterisk
+chown asterisk:asterisk /var/run/asterisk
+chmod 755 /var/run/asterisk
+
+# 5. Удаление возможного старого сокета
+rm -f /var/run/asterisk/asterisk.ctl
+
+
+
 # Создание пустого modules.conf, чтобы избежать ошибки при запуске
 if [ ! -f /etc/asterisk/modules.conf ]; then
     touch /etc/asterisk/modules.conf
@@ -300,6 +341,15 @@ update-rc.d asterisk remove 2>/dev/null || true
 rm -f /etc/init.d/asterisk
 
 # Создаем корректный systemd unit файл
+# --- Настройка systemd сервиса Asterisk (отключаем старый init) ---
+echo "[*] Настройка systemd сервиса Asterisk..."
+
+# Отключаем и удаляем старый init-скрипт
+systemctl disable asterisk 2>/dev/null || true
+update-rc.d asterisk remove 2>/dev/null || true
+rm -f /etc/init.d/asterisk
+
+# Создаём правильный systemd unit
 cat > /etc/systemd/system/asterisk.service <<EOF
 [Unit]
 Description=Asterisk PBX and telephony daemon
@@ -307,8 +357,8 @@ After=network.target mariadb.service
 
 [Service]
 Type=simple
-User=$AST_USER
-Group=$AST_GROUP
+User=asterisk
+Group=asterisk
 WorkingDirectory=/var/lib/asterisk
 ExecStart=/usr/sbin/asterisk -f -C /etc/asterisk/asterisk.conf
 ExecReload=/usr/sbin/asterisk -rx 'core reload'
@@ -322,7 +372,6 @@ EOF
 
 systemctl daemon-reload
 systemctl enable asterisk
-systemctl start asterisk
 
 # -----------------------------------------------------------------------------
 # 12. Базовая настройка Asterisk (транспорт, 30 экстеншенов, диалплан)
@@ -386,6 +435,41 @@ exten => _[1-9]XX,1,Verbose(2, Unknow extension, perhaps outside line)
 exten => _[1-9]XX,n,Playback(invalid)
 exten => _[1-9]XX,n,Hangup()
 EOF
+
+# -----------------------------------------------------------------------------
+# Создание недостающих конфигов (предотвращение ошибок запуска)
+# -----------------------------------------------------------------------------
+echo "[*] Создание базовых конфигурационных файлов Asterisk..."
+
+# modules.conf
+[ ! -f /etc/asterisk/modules.conf ] && cat > /etc/asterisk/modules.conf <<EOF
+[modules]
+autoload=yes
+EOF
+
+# stasis.conf
+[ ! -f /etc/asterisk/stasis.conf ] && cat > /etc/asterisk/stasis.conf <<EOF
+[stasis]
+minimum_size = 1
+EOF
+
+# logger.conf
+[ ! -f /etc/asterisk/logger.conf ] && cat > /etc/asterisk/logger.conf <<EOF
+[general]
+dateformat=%F %T
+
+[logfiles]
+console => notice,warning,error
+full => notice,warning,error,debug,verbose
+EOF
+
+# Права на каталог /var/run/asterisk
+mkdir -p /var/run/asterisk
+chown asterisk:asterisk /var/run/asterisk
+chmod 755 /var/run/asterisk
+rm -f /var/run/asterisk/asterisk.ctl
+
+
 
 # -----------------------------------------------------------------------------
 # 13. Настройка прав доступа к файлам Asterisk
