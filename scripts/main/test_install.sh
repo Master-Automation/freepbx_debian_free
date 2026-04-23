@@ -245,21 +245,21 @@ contrib/scripts/install_prereq install
 make menuselect.makeopts
 
 # Отключение модулей, которые могут быть проблемными (базовый список)
-menuselect/menuselect --disable BUILD_NATIVE menuselect.makeopts
-menuselect/menuselect --disable chan_ooh323 menuselect.makeopts
-menuselect/menuselect --disable chan_mgcp menuselect.makeopts
-menuselect/menuselect --disable app_skel menuselect.makeopts
-menuselect/menuselect --disable res_ari_events menuselect.makeopts
-menuselect/menuselect --disable res_ari_bridges menuselect.makeopts
-menuselect/menuselect --disable res_ari_channels menuselect.makeopts
-menuselect/menuselect --disable res_ari_device_states menuselect.makeopts
-menuselect/menuselect --disable res_ari_endpoints menuselect.makeopts
-menuselect/menuselect --disable res_ari_playbacks menuselect.makeopts
-menuselect/menuselect --disable res_ari_recordings menuselect.makeopts
-menuselect/menuselect --disable res_ari_sounds menuselect.makeopts
-menuselect/menuselect --disable res_stasis_playback menuselect.makeopts
-menuselect/menuselect --disable res_stasis_recording menuselect.makeopts
-menuselect/menuselect --disable res_config_sqlite3 menuselect.makeopts
+menuselect/menuselect --disable BUILD_NATIVE menuselect.makeopts 2>/dev/null || true
+menuselect/menuselect --disable chan_ooh323 menuselect.makeopts 2>/dev/null || true
+menuselect/menuselect --disable chan_mgcp menuselect.makeopts 2>/dev/null || true
+menuselect/menuselect --disable app_skel menuselect.makeopts 2>/dev/null || true
+menuselect/menuselect --disable res_ari_events menuselect.makeopts 2>/dev/null || true
+menuselect/menuselect --disable res_ari_bridges menuselect.makeopts 2>/dev/null || true
+menuselect/menuselect --disable res_ari_channels menuselect.makeopts 2>/dev/null || true
+menuselect/menuselect --disable res_ari_device_states menuselect.makeopts 2>/dev/null || true
+menuselect/menuselect --disable res_ari_endpoints menuselect.makeopts 2>/dev/null || true
+menuselect/menuselect --disable res_ari_playbacks menuselect.makeopts 2>/dev/null || true
+menuselect/menuselect --disable res_ari_recordings menuselect.makeopts 2>/dev/null || true
+menuselect/menuselect --disable res_ari_sounds menuselect.makeopts 2>/dev/null || true
+menuselect/menuselect --disable res_stasis_playback menuselect.makeopts 2>/dev/null || true
+menuselect/menuselect --disable res_stasis_recording menuselect.makeopts 2>/dev/null || true
+menuselect/menuselect --disable res_config_sqlite3 menuselect.makeopts 2>/dev/null || true
 
 # Включаем выбранные звуки (в зависимости от пресета)
 for sound in $CORE_SOUNDS_ENABLED; do
