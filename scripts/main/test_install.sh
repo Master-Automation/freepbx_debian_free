@@ -51,7 +51,7 @@ rm -rf /etc/asterisk /usr/lib/asterisk /var/lib/asterisk /var/log/asterisk /var/
 rm -rf /etc/mysql /var/lib/mysql /etc/my.cnf
 rm -rf /etc/apache2 /var/www/html
 userdel -r $AST_USER 2>/dev/null || true
-groupdel $AST_GROUP 2>/dev/null || true
+groupdel $ 2>/dev/null || true
 
 # Очистка кэша APT и обновление списков пакетов
 apt-get clean
@@ -72,10 +72,24 @@ apt-get install -y net-tools htop screen tshark vim sngrep
 
 # --- 4. Создание пользователя и группы Asterisk ---
 echo "[3/12] Создание пользователя asterisk..."
-addgroup --system $AST_GROUP
-adduser --system --ingroup $AST_GROUP --home /var/lib/asterisk --no-create-home --gecos "Asterisk PBX" $AST_USER
-usermod -a -G $AST_GROUP $AST_USER
-usermod -a -G audio,dialout $AST_USER
+
+# Создаём группу, если её нет
+if ! getent group "$AST_GROUP" >/dev/null; then
+    addgroup --system "$AST_GROUP"
+fi
+
+# Создаём пользователя, если его нет
+if ! id -u "$AST_USER" >/dev/null 2>&1; then
+    adduser --system --ingroup "$AST_GROUP" --home /var/lib/asterisk --no-create-home --gecos "Asterisk PBX" "$AST_USER"
+fi
+
+# Добавляем пользователя в нужные группы (если ещё не добавлен)
+if ! groups "$AST_USER" | grep -q "$AST_GROUP"; then
+    usermod -a -G "$AST_GROUP" "$AST_USER"
+fi
+if ! groups "$AST_USER" | grep -qE "(audio|dialout)"; then
+    usermod -a -G audio,dialout "$AST_USER"
+fi
 
 # --- 5. Настройка часового пояса ---
 timedatectl set-timezone $TIMEZONE
