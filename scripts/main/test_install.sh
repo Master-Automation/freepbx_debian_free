@@ -229,11 +229,18 @@ echo "[4/12] Загрузка и сборка Asterisk ${AST_VERSION}..."
 mkdir -p /usr/src/asterisk
 cd /usr/src/asterisk
 
+# Удаляем старые исходники, чтобы избежать конфликтов прав
+rm -rf /usr/src/asterisk/asterisk-*
+
 # Загрузка последней версии Asterisk 22
 wget https://downloads.asterisk.org/pub/telephony/asterisk/asterisk-22-current.tar.gz
 tar xvf asterisk-22-current.tar.gz
 rm asterisk-22-current.tar.gz
 cd asterisk-22.* 2>/dev/null || cd asterisk-22
+
+# Принудительное исправление прав на исходники
+chown -R root:root .
+chmod -R u+w .
 
 # Установка всех зависимостей сборки через штатный скрипт
 contrib/scripts/install_prereq install
