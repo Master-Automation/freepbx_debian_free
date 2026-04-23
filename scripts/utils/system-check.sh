@@ -1,455 +1,383 @@
 #!/bin/bash
-
-# =============================================================================
-# check-system.sh – Диагност и разведчик для FreePBX 17
-# Версия: 7.0.0
-# =============================================================================
-
-# =============================================================================
-# ОГЛАВЛЕНИЕ:
-#   1.  check_os               – Debian 12, архитектура amd64
-#   2.  check_permissions      – права на запись в /usr/src, /tmp
-#   3.  check_disk_space       – свободное место в /usr/src (≥5 ГБ)
-#   4.  check_internet         – доступ к deb.debian.org, DNS
-#   5.  check_ports            – порты 80 и 3306 свободны?
-#   6.  check_apt              – наличие apt-get и его работа
-#   7.  check_conflicts        – нет уже установленных FreePBX/Asterisk/MySQL
-#   8.  check_hostname         – hostname не localhost и корректный
-#   9.  check_russian_mirrors  – доступность зеркала Яндекса
-#  10.  check_repo_sangoma     – доступность репозитория Sangoma (бинарный Asterisk)
-#  11.  check_freepbx_binary   – доступность бинарного пакета FreePBX (deb) на GitHub
-#  12.  check_freepbx_source   – доступность исходного кода FreePBX core на GitHub
-#  13.  check_asterisk_source  – доступность исходного кода Asterisk на GitHub
-#  14.  check_php_ioncube      – проверка PHP 8.2 и ionCube (для FreePBX)
-#  15.  check_freepbx_readiness – комбинация проверок для FreePBX
-#  16.  RUN_CRITICAL           – набор критических проверок (1-4,6)
-#  17.  RUN_NETWORK            – набор сетевых проверок (4)
-#  18.  RUN_REPOSITORIES       – набор проверок репозиториев (9,10)
-#  19.  RUN_BINARIES_READY     – доступность бинарного пакета FreePBX (11)
-#  20.  RUN_SOURCES_READY      – доступность исходников FreePBX и Asterisk (12,13)
-#  21.  RUN_PREFLIGHT          – комбинация CRITICAL+NETWORK+REPOSITORIES+SOURCES_READY
-#  22.  RUN_CHECK_BY_NAME      – диспетчер для вызова отдельных проверок
-# =============================================================================
+# ======================================================================================
+# Скрипт: system-check.sh
+# Описание: Проверка системы перед установкой Asterisk/FreePBX
+# Версия: 2.0
+# Дата: 2026-04-23
+# Автор: Master Automation
+# ======================================================================================
+#
+# Содержание:
+#   1.  check_os               - Проверка версии ОС (Debian 12)
+#   2.  check_ram              - Проверка оперативной памяти (минимум 2 ГБ)
+#   3.  check_swap             - Проверка наличия и активности swap
+#   4.  check_selinux          - Проверка, отключён ли SELinux
+#   5.  check_apache_mod_rewrite - Проверка доступности модуля Apache mod_rewrite
+#   6.  check_filesystem       - Проверка типа файловой системы (рекомендуется ext4/xfs)
+#   7.  check_kernel_version   - Проверка версии ядра (нужно >= 2.6.25)
+#   8.  check_internet         - Проверка доступа в интернет
+#   9.  check_ports            - Проверка занятости портов (5060, 80, 443, 3306)
+#   10. check_pkg_conflicts    - Проверка конфликтующих пакетов
+#  11. check_disk_space       - Проверка свободного места на диске (>= 5 ГБ)
+#  12. check_write_permissions - Проверка прав на запись в каталоги
+#  13. check_hostname         - Проверка корректности hostname
+#  14. check_time_sync        - Проверка синхронизации времени (NTP)
+#  15. check_static_ip        - Проверка статического IP-адреса
+#  16. check_locale           - Проверка системной локали
+#  17. check_system_updates    - Проверка наличия обновлений системы
+#  18. check_all              - Групповая проверка (запуск всех вышеперечисленных)
+#
+# Использование:
+#   ./system-check.sh            - вывод справки
+#   ./system-check.sh check_all  - запустить все проверки
+#   ./system-check.sh check_ram  - запустить только проверку RAM
+# ======================================================================================
 
 set -e
-
-# -----------------------------------------------------------------------------
-# Переменные и настройки
-# -----------------------------------------------------------------------------
-SCRIPT_VERSION="7.0.0"
-QUIET=false
-error_count=0
-warn_count=0
-
-# Версии для проверки (меняйте здесь)
-FREEPBX_CORE_VERSION="17.0.18.45"
-ASTERISK_VERSION="22.9.0"
-
-# URL для проверок
-FREEPBX_DEB_URL="https://github.com/FreePBX/deb-repository/releases/download/${FREEPBX_CORE_VERSION}/freepbx_${FREEPBX_CORE_VERSION}_amd64.deb"
-FREEPBX_SOURCE_URL="https://github.com/FreePBX/core/archive/refs/tags/release/${FREEPBX_CORE_VERSION}.tar.gz"
-ASTERISK_SOURCE_URL="https://github.com/asterisk/asterisk/releases/download/${ASTERISK_VERSION}/asterisk-${ASTERISK_VERSION}.tar.gz"
-
-# Цвета для вывода
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
 NC='\033[0m'
 
-# -----------------------------------------------------------------------------
-# Вспомогательные функции вывода
-# -----------------------------------------------------------------------------
-log_message() {
-    if [ "$QUIET" = false ]; then
-        echo -e "$1"
-    fi
-}
+print_ok()    { echo -e "${GREEN}[OK]${NC} $1"; }
+print_warn()  { echo -e "${YELLOW}[WARN]${NC} $1"; }
+print_fail()  { echo -e "${RED}[FAIL]${NC} $1"; }
 
-log_error() {
-    log_message "   ${RED}❌ $1${NC}"
-    error_count=$((error_count + 1))
-}
-
-log_warning() {
-    log_message "   ${YELLOW}⚠️ $1${NC}"
-    warn_count=$((warn_count + 1))
-}
-
-log_success() {
-    log_message "   ${GREEN}✅ $1${NC}"
-}
-
-# -----------------------------------------------------------------------------
-# Универсальный запуск проверки с выводом текущего шага
-# -----------------------------------------------------------------------------
-run_check() {
-    local name="$1"
-    local func="$2"
-    log_message "   ${BLUE}▶ ${name}${NC}"
-    "$func"
-    local code=$?
-    if [ $code -ne 0 ]; then
-        log_message "   ${RED}✗ ${name} завершилась с ошибкой (код $code)${NC}"
-    fi
-    return $code
-}
-
-# -----------------------------------------------------------------------------
-# 1. Проверка операционной системы
-# -----------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------
+# 1. Проверка версии ОС (Debian 12)
 check_os() {
-    if [ ! -f /etc/os-release ]; then
-        log_error "Не найден /etc/os-release"
-        return 1
-    fi
-    . /etc/os-release
-    if [ "$ID" != "debian" ] || [ "$VERSION_CODENAME" != "bookworm" ]; then
-        log_error "Требуется Debian 12 (bookworm). Обнаружено: $PRETTY_NAME"
-        return 1
-    fi
-    ARCH=$(dpkg --print-architecture)
-    if [ "$ARCH" != "amd64" ]; then
-        log_error "Архитектура $ARCH не поддерживается. Требуется amd64."
-        return 1
-    fi
-    log_success "ОС: $PRETTY_NAME, архитектура: amd64"
-    return 0
-}
-
-# -----------------------------------------------------------------------------
-# 2. Проверка прав на запись
-# -----------------------------------------------------------------------------
-check_permissions() {
-    local ok=true
-    if [ ! -w /usr/src ]; then
-        log_error "Нет прав на запись в /usr/src"
-        ok=false
-    else
-        log_success "Права на запись в /usr/src"
-    fi
-    if [ ! -w /tmp ]; then
-        log_error "Нет прав на запись в /tmp"
-        ok=false
-    else
-        log_success "Права на запись в /tmp"
-    fi
-    $ok && return 0 || return 2
-}
-
-# -----------------------------------------------------------------------------
-# 3. Проверка свободного места
-# -----------------------------------------------------------------------------
-check_disk_space() {
-    FREE_SPACE=$(df /usr/src | awk 'NR==2 {print $4}')
-    if [ $FREE_SPACE -lt 5242880 ]; then
-        log_error "Недостаточно места в /usr/src: $((FREE_SPACE / 1024)) МБ (нужно ≥5 ГБ)"
-        return 3
-    else
-        log_success "Свободное место в /usr/src: $((FREE_SPACE / 1024)) МБ"
-        return 0
-    fi
-}
-
-# -----------------------------------------------------------------------------
-# 4. Проверка интернета и DNS
-# -----------------------------------------------------------------------------
-check_internet() {
-    if curl -s --connect-timeout 5 https://deb.debian.org > /dev/null 2>&1; then
-        log_success "Интернет доступен (deb.debian.org)"
-    else
-        log_error "Нет доступа к deb.debian.org (проверьте сеть)"
-        return 10
-    fi
-    if ping -c 1 github.com > /dev/null 2>&1; then
-        log_success "DNS работает (github.com разрешается)"
-    else
-        log_warning "GitHub может быть недоступен (проверьте DNS)"
-    fi
-    return 0
-}
-
-# -----------------------------------------------------------------------------
-# 5. Проверка портов 80 и 3306
-# -----------------------------------------------------------------------------
-check_ports() {
-    local problem=false
-    if ss -tlnp | grep -q ':80 '; then
-        log_warning "Порт 80 уже занят. Возможен конфликт с веб-сервером."
-        problem=true
-    else
-        log_success "Порт 80 свободен"
-    fi
-    if ss -tlnp | grep -q ':3306 '; then
-        log_warning "Порт 3306 уже занят. Возможен конфликт с MySQL."
-        problem=true
-    else
-        log_success "Порт 3306 свободен"
-    fi
-    $problem && return 40 || return 0
-}
-
-# -----------------------------------------------------------------------------
-# 6. Проверка apt
-# -----------------------------------------------------------------------------
-check_apt() {
-    if ! command -v apt-get > /dev/null 2>&1; then
-        log_error "apt-get не найден. Это не Debian/Ubuntu?"
-        return 30
-    fi
-    if ! apt-get update --dry-run > /dev/null 2>&1; then
-        log_warning "apt-get update --dry-run не удался (возможно, проблемы с сетью или репозиториями)"
-    fi
-    log_success "apt-get доступен"
-    return 0
-}
-
-# -----------------------------------------------------------------------------
-# 7. Проверка конфликтующих компонентов
-# -----------------------------------------------------------------------------
-check_conflicts() {
-    local problem=false
-    if command -v asterisk > /dev/null 2>&1; then
-        log_warning "Asterisk уже установлен. Возможны конфликты."
-        problem=true
-    fi
-    if command -v fwconsole > /dev/null 2>&1; then
-        log_warning "FreePBX уже установлен. Возможны конфликты."
-        problem=true
-    fi
-    if systemctl is-active --quiet mariadb 2>/dev/null; then
-        log_warning "MySQL/MariaDB уже запущен. Возможны конфликты."
-        problem=true
-    fi
-    $problem && return 31 || return 0
-}
-
-# -----------------------------------------------------------------------------
-# 8. Проверка hostname
-# -----------------------------------------------------------------------------
-check_hostname() {
-    HOST=$(hostname)
-    if [ "$HOST" = "localhost" ] || [ "$HOST" = "localhost.localdomain" ]; then
-        log_warning "Hostname установлен как localhost. Рекомендуется изменить на уникальное имя."
-        return 9
-    elif [[ "$HOST" =~ [[:space:]] ]]; then
-        log_warning "Hostname содержит пробелы или спецсимволы: '$HOST'"
-        return 9
-    else
-        log_success "Hostname: $HOST"
-        return 0
-    fi
-}
-
-# -----------------------------------------------------------------------------
-# 9. Проверка российских зеркал
-# -----------------------------------------------------------------------------
-check_russian_mirrors() {
-    if curl -s --connect-timeout 5 https://mirror.yandex.ru/debian/ > /dev/null 2>&1; then
-        log_success "Зеркало Яндекса (mirror.yandex.ru) доступно"
-        return 0
-    else
-        log_warning "Зеркало Яндекса недоступно – скрипт переключится на официальные репозитории"
-        return 20
-    fi
-}
-
-# -----------------------------------------------------------------------------
-# 10. Проверка доступности репозитория Sangoma (бинарный Asterisk)
-# -----------------------------------------------------------------------------
-check_repo_sangoma() {
-    if curl -s --connect-timeout 5 http://deb.freepbx.org > /dev/null 2>&1; then
-        log_success "Репозиторий Sangoma (deb.freepbx.org) доступен"
-        return 0
-    else
-        log_warning "Репозиторий Sangoma недоступен – установка бинарного Asterisk невозможна"
-        return 21
-    fi
-}
-
-# -----------------------------------------------------------------------------
-# 11. Проверка доступности бинарного пакета FreePBX (deb) на GitHub
-# -----------------------------------------------------------------------------
-check_freepbx_binary() {
-    local http_code
-    http_code=$(curl -s --head --connect-timeout 10 --max-time 15 -o /dev/null -w "%{http_code}" "$FREEPBX_DEB_URL")
-    if [ "$http_code" = "200" ]; then
-        log_success "Бинарный пакет FreePBX $FREEPBX_CORE_VERSION доступен (deb)"
-        return 0
-    else
-        log_warning "Бинарный пакет FreePBX недоступен (HTTP $http_code)"
-        return 25
-    fi
-}
-
-# -----------------------------------------------------------------------------
-# 12. Проверка доступности исходного кода FreePBX core на GitHub
-# -----------------------------------------------------------------------------
-check_freepbx_source() {
-    local http_code
-    http_code=$(curl -s --head --connect-timeout 10 --max-time 15 -o /dev/null -w "%{http_code}" "$FREEPBX_SOURCE_URL")
-    if [ "$http_code" = "200" ]; then
-        log_success "Исходный код FreePBX core $FREEPBX_CORE_VERSION доступен"
-        return 0
-    else
-        log_error "Исходный код FreePBX core недоступен (HTTP $http_code)"
-        return 24
-    fi
-}
-
-# -----------------------------------------------------------------------------
-# 13. Проверка доступности исходного кода Asterisk на GitHub
-# -----------------------------------------------------------------------------
-check_asterisk_source() {
-    local http_code
-    http_code=$(curl -s --head --connect-timeout 10 --max-time 15 -o /dev/null -w "%{http_code}" "$ASTERISK_SOURCE_URL")
-    if [ "$http_code" = "200" ]; then
-        log_success "Исходный код Asterisk $ASTERISK_VERSION доступен"
-        return 0
-    else
-        log_error "Исходный код Asterisk недоступен (HTTP $http_code)"
-        return 27
-    fi
-}
-
-# -----------------------------------------------------------------------------
-# 14. Проверка PHP 8.2 и ionCube (для FreePBX)
-# -----------------------------------------------------------------------------
-check_php_ioncube() {
-    local ok=true
-    if ! command -v php > /dev/null 2>&1; then
-        log_error "PHP не установлен"
-        ok=false
-    else
-        PHP_VERSION=$(php -v | head -1 | grep -oP 'PHP \K[0-9.]+')
-        if [[ "$PHP_VERSION" != 8.2* ]]; then
-            log_error "PHP версия $PHP_VERSION, требуется 8.2.x"
-            ok=false
-        else
-            log_success "PHP версия $PHP_VERSION"
+    if [[ -f /etc/os-release ]]; then
+        . /etc/os-release
+        if [[ "$ID" == "debian" && "$VERSION_ID" == "12" ]]; then
+            print_ok "ОС: Debian 12 (Bookworm)"
+            return 0
         fi
     fi
-    log_warning "ionCube Loader не проверяется (требуется только для коммерческих модулей)"
-    $ok && return 0 || return 70
+    print_fail "Требуется Debian 12 (Bookworm). Текущая ОС: $(cat /etc/os-release 2>/dev/null | grep PRETTY_NAME | cut -d= -f2 | tr -d '"')"
+    return 1
 }
 
-# -----------------------------------------------------------------------------
-# 15. Комплексная проверка готовности к установке FreePBX
-# -----------------------------------------------------------------------------
-check_freepbx_readiness() {
-    run_check "CHECK_REPO_SANGOMA"     check_repo_sangoma     || return $?
-    run_check "CHECK_FREEPBX_BINARY"   check_freepbx_binary   || true
-    run_check "CHECK_FREEPBX_SOURCE"   check_freepbx_source   || return $?
-    run_check "CHECK_ASTERISK_SOURCE"  check_asterisk_source  || return $?
-    run_check "CHECK_PHP_IONCUBE"      check_php_ioncube      || return $?
-    run_check "CHECK_APT"              check_apt              || return $?
-    run_check "CHECK_INTERNET"         check_internet         || return $?
-    return 0
-}
-
-# -----------------------------------------------------------------------------
-# Наборы проверок (мега-функции)
-# -----------------------------------------------------------------------------
-RUN_CRITICAL() {
-    run_check "CHECK_OS"            check_os            || return $?
-    run_check "CHECK_PERMISSIONS"   check_permissions   || return $?
-    run_check "CHECK_DISK_SPACE"    check_disk_space    || return $?
-    run_check "CHECK_INTERNET"      check_internet      || return $?
-    run_check "CHECK_APT"           check_apt           || return $?
-    return 0
-}
-
-RUN_NETWORK() {
-    run_check "CHECK_INTERNET" check_internet || return $?
-    return 0
-}
-
-RUN_REPOSITORIES() {
-    run_check "CHECK_RUSSIAN_MIRRORS" check_russian_mirrors || return $?
-    run_check "CHECK_REPO_SANGOMA"    check_repo_sangoma    || return $?
-    return 0
-}
-
-RUN_BINARIES_READY() {
-    run_check "CHECK_FREEPBX_BINARY" check_freepbx_binary || return $?
-    return 0
-}
-
-RUN_SOURCES_READY() {
-    run_check "CHECK_FREEPBX_SOURCE"  check_freepbx_source  || return $?
-    run_check "CHECK_ASTERISK_SOURCE" check_asterisk_source || return $?
-    return 0
-}
-
-RUN_PREFLIGHT() {
-    RUN_CRITICAL      || return $?
-    RUN_NETWORK       || return $?
-    RUN_REPOSITORIES  || return $?
-    RUN_SOURCES_READY || return $?
-    return 0
-}
-
-# -----------------------------------------------------------------------------
-# Диспетчер: вызов конкретной проверки по имени
-# -----------------------------------------------------------------------------
-run_check_by_name() {
-    local name="$1"
-    case "$name" in
-        CHECK_OS)                   check_os ;;
-        CHECK_PERMISSIONS)          check_permissions ;;
-        CHECK_DISK_SPACE)           check_disk_space ;;
-        CHECK_INTERNET)             check_internet ;;
-        CHECK_PORTS)                check_ports ;;
-        CHECK_APT)                  check_apt ;;
-        CHECK_CONFLICTS)            check_conflicts ;;
-        CHECK_HOSTNAME)             check_hostname ;;
-        CHECK_RUSSIAN_MIRRORS)      check_russian_mirrors ;;
-        CHECK_REPO_SANGOMA)         check_repo_sangoma ;;
-        CHECK_FREEPBX_BINARY)       check_freepbx_binary ;;
-        CHECK_FREEPBX_SOURCE)       check_freepbx_source ;;
-        CHECK_ASTERISK_SOURCE)      check_asterisk_source ;;
-        CHECK_PHP_IONCUBE)          check_php_ioncube ;;
-        CHECK_FREEPBX_READINESS)    check_freepbx_readiness ;;
-        RUN_CRITICAL)               RUN_CRITICAL ;;
-        RUN_NETWORK)                RUN_NETWORK ;;
-        RUN_REPOSITORIES)           RUN_REPOSITORIES ;;
-        RUN_BINARIES_READY)         RUN_BINARIES_READY ;;
-        RUN_SOURCES_READY)          RUN_SOURCES_READY ;;
-        RUN_PREFLIGHT)              RUN_PREFLIGHT ;;
-        *)
-            echo "Неизвестная проверка: $name"
-            exit 0
-            ;;
-    esac
-    local code=$?
-    exit $code
-}
-
-# -----------------------------------------------------------------------------
-# MAIN: обработка аргументов
-# -----------------------------------------------------------------------------
-for arg in "$@"; do
-    case $arg in
-        --quiet) QUIET=true ;;
-    esac
-done
-
-ARGS=()
-for arg in "$@"; do
-    if [[ "$arg" != "--quiet" ]]; then
-        ARGS+=("$arg")
+# --------------------------------------------------------------------------------------
+# 2. Проверка оперативной памяти (минимум 2 ГБ)
+check_ram() {
+    local mem_total_kb=$(grep MemTotal /proc/meminfo | awk '{print $2}')
+    local mem_total_gb=$((mem_total_kb / 1024 / 1024))
+    if [[ $mem_total_gb -ge 2 ]]; then
+        print_ok "Оперативная память: ${mem_total_gb} ГБ (минимум 2 ГБ)"
+        if [[ $mem_total_gb -lt 4 ]]; then
+            print_warn "Рекомендуется 4 ГБ и более для стабильной работы FreePBX"
+        fi
+        return 0
+    else
+        print_fail "Оперативная память: ${mem_total_gb} ГБ (требуется не менее 2 ГБ)"
+        return 1
     fi
-done
+}
 
-if [ ${#ARGS[@]} -eq 0 ]; then
-    RUN_PREFLIGHT
-    exit $?
-elif [ ${#ARGS[@]} -eq 1 ] && [ "${ARGS[0]}" = "--check" ]; then
-    echo "Ошибка: после --check нужно указать имя проверки"
+# --------------------------------------------------------------------------------------
+# 3. Проверка наличия и активности swap
+check_swap() {
+    local swap_total=$(swapon --show --noheadings | wc -l)
+    local swap_size=$(free -m | awk '/Swap:/ {print $2}')
+    if [[ $swap_total -gt 0 && $swap_size -gt 0 ]]; then
+        print_ok "Swap включён, размер: ${swap_size} МБ"
+        return 0
+    else
+        print_fail "Swap не найден или не активен. Рекомендуется создать swap (например, 2 ГБ)"
+        return 1
+    fi
+}
+
+# --------------------------------------------------------------------------------------
+# 4. Проверка, отключён ли SELinux
+check_selinux() {
+    if command -v getenforce &>/dev/null; then
+        local selinux_status=$(getenforce)
+        if [[ "$selinux_status" == "Disabled" ]]; then
+            print_ok "SELinux отключён"
+            return 0
+        else
+            print_fail "SELinux включён (статус: $selinux_status). Отключите SELinux перед установкой."
+            return 1
+        fi
+    else
+        # SELinux не установлен, считаем OK
+        print_ok "SELinux не установлен (или не используется)"
+        return 0
+    fi
+}
+
+# --------------------------------------------------------------------------------------
+# 5. Проверка доступности модуля Apache mod_rewrite
+check_apache_mod_rewrite() {
+    if ! command -v apache2ctl &>/dev/null; then
+        print_warn "Apache не установлен, проверка mod_rewrite пропущена"
+        return 0
+    fi
+    if apache2ctl -M 2>/dev/null | grep -q rewrite_module; then
+        print_ok "Apache mod_rewrite включён"
+        return 0
+    else
+        print_fail "Apache mod_rewrite не включён. Выполните: sudo a2enmod rewrite && sudo systemctl restart apache2"
+        return 1
+    fi
+}
+
+# --------------------------------------------------------------------------------------
+# 6. Проверка типа файловой системы (рекомендуется ext4/xfs)
+check_filesystem() {
+    # Проверяем точку монтирования, где находится /var/lib/asterisk (или /)
+    local mount_point="/"
+    if [[ -d "/var/lib/asterisk" ]]; then
+        mount_point="/var/lib/asterisk"
+    fi
+    local fstype=$(df -T "$mount_point" | awk 'NR==2 {print $2}')
+    if [[ "$fstype" == "ext4" || "$fstype" == "xfs" ]]; then
+        print_ok "Файловая система для $mount_point: $fstype (рекомендуется)"
+    else
+        print_warn "Файловая система для $mount_point: $fstype. Рекомендуется ext4 или xfs для лучшей производительности"
+    fi
+    return 0
+}
+
+# --------------------------------------------------------------------------------------
+# 7. Проверка версии ядра Linux (минимальная 2.6.25)
+check_kernel_version() {
+    local kernel_version=$(uname -r | cut -d- -f1)
+    local major=$(echo "$kernel_version" | cut -d. -f1)
+    local minor=$(echo "$kernel_version" | cut -d. -f2)
+    local patch=$(echo "$kernel_version" | cut -d. -f3 | sed 's/[^0-9].*//')
+    # Сравниваем с 2.6.25
+    if [[ $major -gt 2 ]] || \
+       [[ $major -eq 2 && $minor -gt 6 ]] || \
+       [[ $major -eq 2 && $minor -eq 6 && $patch -ge 25 ]]; then
+        print_ok "Версия ядра: $kernel_version (>= 2.6.25)"
+        return 0
+    else
+        print_fail "Версия ядра: $kernel_version (требуется 2.6.25 или новее)"
+        return 1
+    fi
+}
+
+# --------------------------------------------------------------------------------------
+# 8. Проверка доступа в интернет
+check_internet() {
+    if ping -c 1 8.8.8.8 &>/dev/null; then
+        print_ok "Есть доступ в интернет"
+        return 0
+    else
+        print_fail "Нет доступа в интернет (не пингуется 8.8.8.8)"
+        return 1
+    fi
+}
+
+# --------------------------------------------------------------------------------------
+# 9. Проверка занятости портов (5060, 80, 443, 3306)
+check_ports() {
+    local ports=(5060 80 443 3306)
+    local occupied=()
+    for port in "${ports[@]}"; do
+        if ss -tuln | grep -q ":$port "; then
+            occupied+=($port)
+        fi
+    done
+    if [[ ${#occupied[@]} -eq 0 ]]; then
+        print_ok "Все необходимые порты свободны (5060,80,443,3306)"
+        return 0
+    else
+        print_fail "Заняты порты: ${occupied[*]}. Освободите их перед установкой."
+        return 1
+    fi
+}
+
+# --------------------------------------------------------------------------------------
+# 10. Проверка конфликтующих пакетов
+check_pkg_conflicts() {
+    local conflict_pkgs=(asterisk freepbx mariadb-server mysql-server apache2 php5)
+    local found=()
+    for pkg in "${conflict_pkgs[@]}"; do
+        if dpkg -l | grep -qw "^ii.*$pkg"; then
+            found+=($pkg)
+        fi
+    done
+    if [[ ${#found[@]} -eq 0 ]]; then
+        print_ok "Конфликтующие пакеты не обнаружены"
+        return 0
+    else
+        print_fail "Обнаружены конфликтующие пакеты: ${found[*]}. Удалите их."
+        return 1
+    fi
+}
+
+# --------------------------------------------------------------------------------------
+# 11. Проверка свободного места на диске (>= 5 ГБ)
+check_disk_space() {
+    local avail_kb=$(df / --output=avail | tail -n1)
+    local avail_gb=$((avail_kb / 1024 / 1024))
+    if [[ $avail_gb -ge 5 ]]; then
+        print_ok "Свободного места на диске: ${avail_gb} ГБ (минимум 5 ГБ)"
+        return 0
+    else
+        print_fail "Свободного места на диске: ${avail_gb} ГБ (требуется минимум 5 ГБ)"
+        return 1
+    fi
+}
+
+# --------------------------------------------------------------------------------------
+# 12. Проверка прав на запись в каталоги
+check_write_permissions() {
+    local dirs=("/etc/asterisk" "/var/lib/asterisk" "/var/log/asterisk" "/var/run/asterisk")
+    local ok=true
+    for dir in "${dirs[@]}"; do
+        if [[ -d "$dir" ]]; then
+            if [[ -w "$dir" ]]; then
+                print_ok "Права на запись в $dir есть"
+            else
+                print_fail "Нет прав на запись в $dir"
+                ok=false
+            fi
+        else
+            # Каталог не существует - проверяем родительский
+            local parent=$(dirname "$dir")
+            if [[ -w "$parent" ]]; then
+                print_ok "Каталог $dir будет создан (родитель $parent доступен)"
+            else
+                print_fail "Нет прав на создание $dir (родитель $parent недоступен)"
+                ok=false
+            fi
+        fi
+    done
+    $ok && return 0 || return 1
+}
+
+# --------------------------------------------------------------------------------------
+# 13. Проверка корректности hostname
+check_hostname() {
+    local host=$(hostname -f 2>/dev/null || hostname)
+    if [[ "$host" =~ ^[a-zA-Z0-9.-]+$ ]] && [[ ! "$host" =~ localhost$ ]]; then
+        print_ok "Hostname: $host"
+        return 0
+    else
+        print_warn "Hostname = $host. Рекомендуется использовать FQDN (не localhost)"
+        return 0
+    fi
+}
+
+# --------------------------------------------------------------------------------------
+# 14. Проверка синхронизации времени (NTP)
+check_time_sync() {
+    if timedatectl status 2>/dev/null | grep -q "System clock synchronized: yes"; then
+        print_ok "Время синхронизировано (NTP работает)"
+        return 0
+    elif command -v chronyc &>/dev/null && chronyc tracking &>/dev/null; then
+        print_ok "Время синхронизировано (chrony)"
+        return 0
+    elif command -v ntpq &>/dev/null && ntpq -p &>/dev/null; then
+        print_ok "Время синхронизировано (ntpd)"
+        return 0
+    else
+        print_warn "Время не синхронизировано. Установите NTP (chrony) для корректной работы SIP"
+        return 0
+    fi
+}
+
+# --------------------------------------------------------------------------------------
+# 15. Проверка статического IP-адреса
+check_static_ip() {
+    # Проверяем, что интерфейс не использует DHCP (упрощённо)
+    if ip route | grep -q "default via" && ! systemctl is-active --quiet networking; then
+        # Если networking не активен, возможно systemd-networkd
+        print_warn "Проверка статического IP: рекомендуется статический IP, убедитесь вручную"
+        return 0
+    else
+        # Более точная проверка: смотрим конфиги
+        if grep -rq "dhcp" /etc/network/interfaces* 2>/dev/null; then
+            print_warn "Обнаружена настройка DHCP. Рекомендуется использовать статический IP."
+        else
+            print_ok "Скорее всего, статический IP настроен"
+        fi
+        return 0
+    fi
+}
+
+# --------------------------------------------------------------------------------------
+# 16. Проверка системной локали
+check_locale() {
+    if locale -a | grep -q "ru_RU.utf8\|en_US.utf8" && locale | grep -q "UTF-8"; then
+        print_ok "Локаль UTF-8 настроена"
+        return 0
+    else
+        print_warn "Локаль может быть некорректной. Рекомендуется: sudo locale-gen ru_RU.UTF-8 en_US.UTF-8 && sudo update-locale"
+        return 0
+    fi
+}
+
+# --------------------------------------------------------------------------------------
+# 17. Проверка наличия обновлений системы
+check_system_updates() {
+    apt-get update 2>&1 | grep -v "W:" >/dev/null
+    local updates=$(apt list --upgradable 2>/dev/null | grep -c upgradable || echo 0)
+    if [[ $updates -eq 0 ]]; then
+        print_ok "Система обновлена"
+        return 0
+    else
+        print_warn "Доступно $updates обновлений. Рекомендуется выполнить apt upgrade перед установкой"
+        return 0
+    fi
+}
+
+# --------------------------------------------------------------------------------------
+# 18. Групповая проверка (запуск всех)
+check_all() {
+    local failed=0
+    local tests=(
+        check_os
+        check_ram
+        check_swap
+        check_selinux
+        check_apache_mod_rewrite
+        check_filesystem
+        check_kernel_version
+        check_internet
+        check_ports
+        check_pkg_conflicts
+        check_disk_space
+        check_write_permissions
+        check_hostname
+        check_time_sync
+        check_static_ip
+        check_locale
+        check_system_updates
+    )
+    for test in "${tests[@]}"; do
+        if ! $test; then
+            ((failed++))
+        fi
+        echo "--------------------------------------------------"
+    done
+
+    if [[ $failed -eq 0 ]]; then
+        echo -e "\n${GREEN}Все проверки пройдены успешно. Система готова к установке.${NC}"
+        return 0
+    else
+        echo -e "\n${RED}Количество неудачных проверок: $failed. Исправьте ошибки перед установкой.${NC}"
+        return 1
+    fi
+}
+
+# --------------------------------------------------------------------------------------
+# Основной блок: разбор аргументов
+if [[ $# -eq 0 ]]; then
+    echo "Использование: $0 {check_all|check_os|check_ram|...}"
+    echo "Доступные проверки:"
+    grep -E "^check_[a-z_]+\(\)" "$0" | sed 's/()//' | sed 's/check_/  check_/'
     exit 0
-elif [ ${#ARGS[@]} -eq 2 ] && [ "${ARGS[0]}" = "--check" ]; then
-    run_check_by_name "${ARGS[1]}"
+fi
+
+command=$1
+if declare -f "$command" > /dev/null; then
+    "$command"
 else
-    echo "Использование: check-system.sh [--quiet] [--check ИМЯ]"
-    exit 0
+    echo "Ошибка: неизвестная проверка '$command'"
+    exit 1
 fi
