@@ -23,6 +23,24 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
+# --- Очистка источников apt от дубликатов ---
+echo "[0/12] Устранение дублирующихся записей в sources.list..."
+if [[ -f /etc/apt/sources.list ]]; then
+    # Удаляем явные дубликаты строк (сохраняем только уникальные)
+    mv /etc/apt/sources.list /etc/apt/sources.list.bak
+    awk '!seen[$0]++' /etc/apt/sources.list.bak > /etc/apt/sources.list
+fi
+
+# Удаляем возможные дублирующиеся файлы .list в sources.list.d (оставляем только один freepbx.list)
+rm -f /etc/apt/sources.list.d/freepbx.list.old 2>/dev/null
+# Проверяем, не добавлен ли репозиторий freepbx несколько раз в разных файлах
+if grep -rq "deb.freepbx.org" /etc/apt/sources.list.d/; then
+    # Оставляем только один файл с этим репозиторием
+    find /etc/apt/sources.list.d/ -name "*.list" -exec grep -l "deb.freepbx.org" {} \; | head -n1 | xargs -I {} sh -c 'cp {} /etc/apt/sources.list.d/freepbx.list.uniq && find /etc/apt/sources.list.d/ -name "*.list" -exec rm -f {} \; && mv /etc/apt/sources.list.d/freepbx.list.uniq /etc/apt/sources.list.d/freepbx.list'
+fi
+
+apt-get update
+
 # Проверка ОС
 if [[ ! -f /etc/debian_version ]] || ! grep -q "Bookworm" /etc/os-release; then
     echo "Ошибка: Скрипт поддерживает только Debian 12 (Bookworm)."
