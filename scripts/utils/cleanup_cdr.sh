@@ -157,12 +157,32 @@ else
     log "Нет записей старше $DAYS дней. Очистка не требуется"
 fi
 
-# Обновляем резервную копию на втором диске (если он примонтирован)
+# --- Резервное копирование скрипта на второй диск ---
+SCRIPT_SOURCE="$0"
+BACKUP_DIR="/mnt/storage/FreePBX-16/scripts"
+BACKUP_PATH="$BACKUP_DIR/cleanup_cdr.sh"
+
+log "Проверка резервного копирования скрипта..."
+
 if mountpoint -q /mnt/storage; then
-    cp "$0" /mnt/storage/FreePBX-16/scripts/cleanup_cdr.sh
-    log "Резервная копия скрипта обновлена на втором диске"
+    if [ ! -d "$BACKUP_DIR" ]; then
+        log "⚠️ Целевая директория для резервной копии отсутствует: $BACKUP_DIR"
+        log "   Чтобы включить авто-бэкап скрипта, выполните вручную:"
+        echo "     sudo mkdir -p $BACKUP_DIR"
+        log "   После этого скрипт будет копировать себя при каждом запуске."
+    else
+        cp "$SCRIPT_SOURCE" "$BACKUP_PATH"
+        if [ $? -eq 0 ]; then
+            log "✅ Резервная копия скрипта сохранена: $BACKUP_PATH"
+        else
+            log "❌ ОШИБКА: Не удалось скопировать скрипт в $BACKUP_PATH"
+            log "   Проверьте права на запись в $BACKUP_DIR"
+        fi
+    fi
 else
-    log "Второй диск не примонтирован, резервная копия не обновлена"
+    log "⚠️ Второй диск НЕ примонтирован в /mnt/storage."
+    log "   Резервная копия скрипта НЕ создана."
+    log "   Ожидаемый путь монтирования: /mnt/storage (проверьте /etc/fstab)"
 fi
 
 count_cdr_records "Количество записей в CDR после очистки"
